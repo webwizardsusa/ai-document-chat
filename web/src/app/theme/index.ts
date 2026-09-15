@@ -1,0 +1,1 @@
+export { useThemeSettings } from './useThemeSettings';
