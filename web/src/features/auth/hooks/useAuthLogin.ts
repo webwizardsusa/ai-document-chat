@@ -2,6 +2,7 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { useLocation, useNavigate } from 'react-router';
 import { useAppDispatch } from '@/app/store';
+import { broadcastCredentials } from '@/features/auth/authSync';
 import { useLoginMutation } from '../api/authApi';
 import { loginSchema, type LoginSchema } from '../schema/loginSchema';
 import { setCredentials } from '../slices/authSlice';
@@ -24,6 +25,7 @@ export const useAuthLogin = () => {
     try {
       const result = await login(values).unwrap();
       dispatch(setCredentials(result));
+      broadcastCredentials(result);
       const fromQuery = new URLSearchParams(location.search).get('from');
       const fromState = (location.state as { from?: string } | null)?.from;
       const candidate = fromQuery || fromState || '/';

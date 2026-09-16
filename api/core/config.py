@@ -7,6 +7,19 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from models.constants import VECTOR_DIMENSION
 
+# Committed example / placeholder secrets — never allow outside APP_ENV=local.
+_WEAK_JWT_SECRETS = frozenset(
+    {
+        "change-me-to-a-long-random-secret",
+        "changeme",
+        "secret",
+        "local-dev-only-change-me-32chars-min",
+        "replace-with-a-unique-random-secret-at-least-32-chars",
+        # Historical value from an older .env.example — treat as public.
+        "BFwiMx8o59jwmWmOh8ADiHuKc7NmAV8qJKjpr0D8ahxv5d5TbpFt1eYcM2e4ymAB",
+    }
+)
+
 
 class Settings(BaseSettings):
     APP_ENV: Literal["local", "development", "staging", "production"] = "local"
@@ -55,15 +68,19 @@ class Settings(BaseSettings):
         return value or None
 
     @model_validator(mode="after")
-    def reject_weak_jwt_in_non_local(self) -> "Settings":
-        weak = {
-            "change-me-to-a-long-random-secret",
-            "changeme",
-            "secret",
-            "local-dev-only-change-me-32chars-min",
-        }
-        if self.APP_ENV != "local" and self.jwt_secret in weak:
-            raise ValueError("JWT_SECRET_KEY must be a strong non-placeholder secret")
+    def validate_security_settings(self) -> "Settings":
+        if self.REFRESH_COOKIE_SAMESITE == "none" and not (
+            self.REFRESH_COOKIE_SECURE or self.APP_ENV != "local"
+        ):
+            raise ValueError(
+                "REFRESH_COOKIE_SAMESITE=none requires a Secure cookie "
+                "(set REFRESH_COOKIE_SECURE=true or use a non-local APP_ENV)"
+            )
+
+        if self.APP_ENV != "local" and self.jwt_secret in _WEAK_JWT_SECRETS:
+            raise ValueError(
+                "JWT_SECRET_KEY must be a strong unique secret in non-local environments"
+            )
         return self
 
 

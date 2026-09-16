@@ -22,6 +22,7 @@ class DocumentResponse(BaseModel):
 
 # Limits for upload (V1)
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MB
+MAX_ORIGINAL_NAME_LENGTH = 500
 ALLOWED_MIME_TYPES = {
     "application/pdf",
     "text/plain",

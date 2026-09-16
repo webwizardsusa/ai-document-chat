@@ -4,7 +4,7 @@ from fastapi import APIRouter
 
 from core.deps import CurrentUserDep, DbDep
 from core.responses import success
-from modules.workspace.schema import CreateWorkspaceRequest, WorkspaceResponse
+from modules.workspace.schema import CreateWorkspaceRequest
 from modules.workspace.service import WorkspaceService
 
 router = APIRouter(prefix="/workspaces", tags=["Workspaces"])
@@ -15,7 +15,7 @@ def list_workspaces(current_user: CurrentUserDep, db: DbDep):
     workspaces = WorkspaceService(db).list_for_user(current_user)
     return success(
         message="Workspaces fetched successfully",
-        result=[WorkspaceResponse.model_validate(w) for w in workspaces],
+        result=workspaces,
     )
 
 
@@ -28,7 +28,7 @@ def create_workspace(
     workspace = WorkspaceService(db).create(current_user, payload)
     return success(
         message="Workspace created successfully",
-        result=WorkspaceResponse.model_validate(workspace),
+        result=workspace,
         status_code=201,
     )
 
@@ -39,8 +39,8 @@ def get_workspace(
     current_user: CurrentUserDep,
     db: DbDep,
 ):
-    workspace = WorkspaceService(db).get_owned(workspace_id, current_user)
+    workspace = WorkspaceService(db).get_owned_response(workspace_id, current_user)
     return success(
         message="Workspace fetched successfully",
-        result=WorkspaceResponse.model_validate(workspace),
+        result=workspace,
     )

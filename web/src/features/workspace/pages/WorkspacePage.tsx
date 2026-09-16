@@ -12,11 +12,31 @@ const WorkspacePage = () => {
     workspaceId,
     selected,
     hasWorkspaces,
+    workspacesError,
+    refetchWorkspaces,
     openCreateWorkspace,
     docsLoading,
+    docsError,
+    refetchDocuments,
     hasDocuments,
     hasReadyDocument,
+    hasFailedDocument,
   } = useWorkspacePage();
+
+  if (workspacesError && !hasWorkspaces) {
+    return (
+      <PageContainer title="Workspaces" description="Failed to load">
+        <Box sx={{ p: 3, textAlign: 'center' }}>
+          <Typography color="textSecondary" sx={{ mb: 2 }}>
+            Couldn’t load workspaces.
+          </Typography>
+          <Button variant="contained" onClick={refetchWorkspaces}>
+            Retry
+          </Button>
+        </Box>
+      </PageContainer>
+    );
+  }
 
   if (!hasWorkspaces) {
     return (
@@ -86,7 +106,7 @@ const WorkspacePage = () => {
       <PageContainer title="Select workspace" description="Choose a workspace">
         <Box sx={{ p: 3 }}>
           <Typography color="textSecondary">
-            Expand a workspace in the sidebar to continue.
+            Select a workspace in the sidebar to continue.
           </Typography>
         </Box>
       </PageContainer>
@@ -115,6 +135,20 @@ const WorkspacePage = () => {
         >
           {docsLoading ? (
             <Typography color="textSecondary">Loading documents...</Typography>
+          ) : docsError ? (
+            <Stack spacing={2} sx={{ maxWidth: 420, textAlign: 'center' }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Couldn’t load documents
+              </Typography>
+              <Typography color="textSecondary">
+                Something went wrong while fetching documents for this workspace.
+              </Typography>
+              <Box sx={{ alignSelf: 'center' }}>
+                <Button variant="contained" onClick={() => void refetchDocuments()}>
+                  Retry
+                </Button>
+              </Box>
+            </Stack>
           ) : !hasDocuments ? (
             <Stack spacing={2} sx={{ maxWidth: 480, textAlign: 'center' }}>
               <Box
@@ -147,6 +181,23 @@ const WorkspacePage = () => {
                 />
               </Box>
             </Stack>
+          ) : hasFailedDocument && !hasReadyDocument ? (
+            <Stack spacing={1.5} sx={{ maxWidth: 480, textAlign: 'center' }}>
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                Document processing failed
+              </Typography>
+              <Typography color="textSecondary">
+                Open the documents panel for details, or upload the file again.
+              </Typography>
+              <Box sx={{ alignSelf: 'center' }}>
+                <UploadDocumentButton
+                  workspaceId={selected.id}
+                  variant="contained"
+                  size="medium"
+                  label="Upload again"
+                />
+              </Box>
+            </Stack>
           ) : !hasReadyDocument ? (
             <Stack spacing={1.5} sx={{ maxWidth: 480, textAlign: 'center' }}>
               <Typography variant="h5" sx={{ fontWeight: 700 }}>
@@ -174,11 +225,12 @@ const WorkspacePage = () => {
         <Box
           sx={{
             borderTop: (theme) => `1px solid ${theme.palette.divider}`,
-            p: 2,
+            p: { xs: 1.5, sm: 2 },
             bgcolor: 'background.paper',
+            width: '100%',
           }}
         >
-          <Box sx={{ position: 'relative', maxWidth: 900, mx: 'auto' }}>
+          <Box sx={{ position: 'relative', width: '100%' }}>
             <TextField
               fullWidth
               placeholder={
@@ -190,6 +242,7 @@ const WorkspacePage = () => {
               multiline
               maxRows={4}
               sx={{
+                width: '100%',
                 '& .MuiOutlinedInput-root': {
                   borderRadius: 3,
                   bgcolor: 'grey.100',

@@ -1,62 +1,51 @@
 import { Grid, Box, Typography } from '@mui/material';
-import { PageContainer, Logo } from '@/shared/components';
+import { PageContainer } from '@/shared/components';
 import { loginBg } from '@/shared/assets';
 import AuthLogin from '@/features/auth/components/AuthLogin';
 
 const Login = () => (
   <PageContainer title="Login" description="AI Document Chat login">
-    <Grid container spacing={0} sx={{ overflowX: 'hidden' }}>
+    <Grid
+      container
+      spacing={0}
+      sx={{
+        width: '100%',
+        height: '100dvh',
+        maxHeight: '100dvh',
+        overflow: 'hidden',
+      }}
+    >
       <Grid
         size={{
-          xs: 12,
-          sm: 12,
+          xs: 0,
           lg: 7,
           xl: 8,
         }}
         sx={{
+          display: { xs: 'none', lg: 'block' },
+          height: '100%',
           position: 'relative',
-          '&:before': {
-            content: '""',
-            background: 'radial-gradient(#d2f1df, #d3d7fa, #bad8f4)',
-            backgroundSize: '400% 400%',
-            animation: 'gradient 15s ease infinite',
-            position: 'absolute',
-            height: '100%',
-            width: '100%',
-            opacity: '0.3',
-          },
+          overflow: 'hidden',
         }}
       >
-        <Box sx={{ position: 'relative' }}>
-          <Box sx={{ px: 3 }}>
-            <Logo />
-          </Box>
-          <Box
-            sx={{
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: 'calc(100vh - 75px)',
-              display: {
-                xs: 'none',
-                lg: 'flex',
-              },
-            }}
-          >
-            <img
-              src={loginBg}
-              alt=""
-              style={{
-                width: '100%',
-                maxWidth: '500px',
-              }}
-            />
-          </Box>
-        </Box>
+        <Box
+          component="img"
+          src={loginBg}
+          alt=""
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'center',
+            display: 'block',
+          }}
+        />
       </Grid>
       <Grid
         size={{
           xs: 12,
-          sm: 12,
           lg: 5,
           xl: 4,
         }}
@@ -64,9 +53,11 @@ const Login = () => (
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
+          height: '100%',
+          overflow: 'auto',
         }}
       >
-        <Box sx={{ p: 4 }}>
+        <Box sx={{ p: 4, width: '100%', maxWidth: 420 }}>
           <AuthLogin
             title="Welcome to AI Document Chat"
             subtext={

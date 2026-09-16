@@ -1,9 +1,10 @@
 export const layoutConfig = {
   direction: 'ltr' as const,
   borderRadius: 7,
-  sidebarWidth: 270,
+  sidebarWidth: 280,
+  docsSidebarWidth: 340,
   miniSidebarWidth: 87,
-  topbarHeight: 70,
+  topbarHeight: 64,
 };
 
 export type SidebarCollapse = 'full-sidebar' | 'mini-sidebar';

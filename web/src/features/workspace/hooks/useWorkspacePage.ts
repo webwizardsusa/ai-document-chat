@@ -1,40 +1,43 @@
-import { useEffect } from 'react';
 import { useOutletContext, useParams } from 'react-router';
-import { useGetDocumentsQuery } from '@/features/document/api/documentApi';
+import { useDocumentsQuery } from '@/features/document/hooks';
 import type { WorkspaceOutletContext } from './useWorkspaceShell';
 
 export const useWorkspacePage = () => {
   const { workspaceId } = useParams<{ workspaceId?: string }>();
-  const { workspace, workspaces, openCreateWorkspace } =
-    useOutletContext<WorkspaceOutletContext>();
+  const {
+    workspace,
+    workspaces,
+    openCreateWorkspace,
+    workspacesError,
+    refetchWorkspaces,
+  } = useOutletContext<WorkspaceOutletContext>();
 
   const selected = workspace ?? null;
-  const { data: documents = [], isLoading: docsLoading, refetch } = useGetDocumentsQuery(
-    selected?.id ?? '',
-    { skip: !selected },
-  );
-
-  const hasPending = documents.some(
-    (d) => d.status === 'uploaded' || d.status === 'processing',
-  );
-
-  useEffect(() => {
-    if (!selected || !hasPending) return;
-    const timer = window.setInterval(() => {
-      void refetch();
-    }, 3000);
-    return () => window.clearInterval(timer);
-  }, [selected, hasPending, refetch]);
+  const {
+    documents,
+    isLoading: docsLoading,
+    isError: docsError,
+    isEmpty,
+    hasReadyDocument,
+    hasFailedDocument,
+    refetch: refetchDocuments,
+  } = useDocumentsQuery(selected?.id);
 
   return {
     workspaceId,
     workspaces,
     selected,
     hasWorkspaces: workspaces.length > 0,
+    workspacesError,
+    refetchWorkspaces,
     openCreateWorkspace,
     documents,
     docsLoading,
+    docsError,
+    refetchDocuments,
     hasDocuments: documents.length > 0,
-    hasReadyDocument: documents.some((d) => d.status === 'ready'),
+    isDocsEmpty: isEmpty,
+    hasReadyDocument,
+    hasFailedDocument,
   };
 };

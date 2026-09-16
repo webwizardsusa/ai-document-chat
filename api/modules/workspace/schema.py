@@ -19,6 +19,7 @@ class CreateWorkspaceRequest(BaseModel):
 class WorkspaceResponse(BaseModel):
     id: UUID
     name: str
+    document_count: int = 0
     created_at: datetime
     updated_at: datetime
 

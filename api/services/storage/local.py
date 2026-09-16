@@ -22,9 +22,13 @@ class LocalStorage:
         return f"{workspace_id}/{document_id}/{safe_name}"
 
     def absolute_path(self, storage_key: str) -> Path:
-        path = (self.root / storage_key).resolve()
-        if not str(path).startswith(str(self.root)):
+        if not storage_key or storage_key.startswith("/") or ".." in Path(storage_key).parts:
             raise ValueError("Invalid storage key")
+        path = (self.root / storage_key).resolve()
+        try:
+            path.relative_to(self.root)
+        except ValueError as exc:
+            raise ValueError("Invalid storage key") from exc
         return path
 
     def save(self, storage_key: str, data: bytes) -> None:

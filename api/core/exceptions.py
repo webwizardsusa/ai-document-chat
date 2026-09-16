@@ -17,7 +17,7 @@ def register_exception_handlers(app):
     ):
         return unprocessable(
             message="Validation failed",
-            errors=exc.errors(),
+            errors=exc.errors(include_input=False),
         )
 
     @app.exception_handler(HTTPException)

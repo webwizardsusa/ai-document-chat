@@ -6,6 +6,10 @@ import {
   type FetchBaseQueryError,
   type FetchBaseQueryMeta,
 } from '@reduxjs/toolkit/query/react';
+import {
+  broadcastCredentials,
+  withRefreshLock,
+} from '@/features/auth/authSync';
 import { logout, setCredentials } from '@/features/auth/slices/authSlice';
 import type { LoginResponse } from '@/features/auth/types/auth';
 
@@ -78,7 +82,14 @@ const refreshAccessToken: BaseQueryFn<
   FetchBaseQueryMeta
 > = async (_args, api, extraOptions) => {
   if (!refreshPromise) {
-    refreshPromise = (async () => {
+    refreshPromise = withRefreshLock(async () => {
+      // Another tab may have refreshed while we waited for the lock.
+      const existing = (api.getState() as AuthRootState).auth.accessToken;
+      if (existing) {
+        // Re-check by attempting nothing — caller retries original request.
+        // Still run refresh if we got here from 401; cookie may be rotated.
+      }
+
       const refreshResult = await rawBaseQuery(
         { url: '/auth/refresh', method: 'POST', body: {} },
         api,
@@ -95,8 +106,9 @@ const refreshAccessToken: BaseQueryFn<
       }
 
       api.dispatch(setCredentials(payload));
+      broadcastCredentials(payload);
       return payload;
-    })().finally(() => {
+    }).finally(() => {
       refreshPromise = null;
     });
   }
@@ -138,8 +150,6 @@ const baseQueryWithEnvelope: BaseQueryFn<
   }
 
   if (result.error) {
-    // Do not clear session on login/register/refresh 401 — that would
-    // resetApiState and wipe the mutation error the UI needs to show.
     if (result.error.status === 401 && !isAuthBootstrapUrl(url)) {
       api.dispatch(logout());
     }

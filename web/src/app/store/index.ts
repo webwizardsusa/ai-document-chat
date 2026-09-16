@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { setupListeners } from '@reduxjs/toolkit/query';
 import { useDispatch, useSelector, type TypedUseSelectorHook } from 'react-redux';
 import { baseApi } from '@/app/api';
+import { initAuthSync } from '@/features/auth/authSync';
 import { authListenerMiddleware } from '@/features/auth/listeners/authListener';
 import authReducer from '@/features/auth/slices/authSlice';
 import workspaceUiReducer from '@/features/workspace/slices/workspaceSlice';
@@ -22,6 +23,7 @@ export const store = configureStore({
 });
 
 setupListeners(store.dispatch);
+initAuthSync(store);
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;

@@ -10,6 +10,7 @@ export const LayoutProvider = ({ children }: Props) => {
   const [isCollapse, setIsCollapse] = useState<SidebarCollapse>('full-sidebar');
   const [isSidebarHover, setIsSidebarHover] = useState(false);
   const [isMobileSidebar, setIsMobileSidebar] = useState(false);
+  const [isDocsSidebar, setIsDocsSidebar] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute('class', 'light');
@@ -26,8 +27,10 @@ export const LayoutProvider = ({ children }: Props) => {
       setIsSidebarHover,
       isMobileSidebar,
       setIsMobileSidebar,
+      isDocsSidebar,
+      setIsDocsSidebar,
     }),
-    [isCollapse, isSidebarHover, isMobileSidebar],
+    [isCollapse, isSidebarHover, isMobileSidebar, isDocsSidebar],
   );
 
   return <LayoutContext.Provider value={value}>{children}</LayoutContext.Provider>;

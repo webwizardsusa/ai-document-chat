@@ -21,6 +21,8 @@ from services.storage import get_storage
 
 logger = logging.getLogger(__name__)
 
+USER_FACING_FAILURE = "Document processing failed. Please try uploading again."
+
 
 class DocumentProcessor:
     def __init__(self, db: Session):
@@ -35,6 +37,16 @@ class DocumentProcessor:
             raise ValueError(f"Job not found: {job_id}")
 
         if job.status == JobStatus.COMPLETED.value:
+            return {"skipped": True, "status": job.status}
+
+        # Another worker already claimed this job (acks_late redelivery).
+        if job.status == JobStatus.RUNNING.value:
+            return {"skipped": True, "status": job.status}
+
+        if job.status not in {
+            JobStatus.PENDING.value,
+            JobStatus.FAILED.value,
+        }:
             return {"skipped": True, "status": job.status}
 
         document_id = job.document_id
@@ -58,9 +70,16 @@ class DocumentProcessor:
         job.error = None
         document.status = DocumentStatus.PROCESSING.value
         document.error_message = None
+        # Release row locks before long-running parse/embed work.
         self.db.commit()
 
         try:
+            # Re-bind after commit (expire_on_commit=False keeps attrs; refresh ids).
+            document = self.db.get(Document, document_id)
+            job = self.db.get(Job, job_id)
+            if document is None or job is None:
+                raise ValueError("Document or job missing after claim")
+
             result = self._run(document)
             job.status = JobStatus.COMPLETED.value
             job.result = result
@@ -115,21 +134,21 @@ class DocumentProcessor:
             "embedding_model": settings.EMBEDDING_MODEL,
         }
 
-    def _mark_failed(self, job_id: UUID, document_id: UUID, message: str) -> None:
+    def _mark_failed(self, job_id: UUID, document_id: UUID, detail: str) -> None:
         job = self.db.get(Job, job_id)
         document = self.db.get(Document, document_id)
         now = datetime.now(timezone.utc)
         if job is not None:
             job.status = JobStatus.FAILED.value
-            job.error = message[:4000]
+            job.error = detail[:4000]
             job.completed_at = now
         if document is not None:
             document.status = DocumentStatus.FAILED.value
-            document.error_message = message[:4000]
+            document.error_message = USER_FACING_FAILURE
         self.db.commit()
 
-    def _fail_job(self, job: Job, message: str) -> None:
+    def _fail_job(self, job: Job, detail: str) -> None:
         job.status = JobStatus.FAILED.value
-        job.error = message[:4000]
+        job.error = detail[:4000]
         job.completed_at = datetime.now(timezone.utc)
         self.db.commit()

@@ -12,6 +12,8 @@ export type WorkspaceOutletContext = {
   workspace: Workspace | null;
   workspaces: Workspace[];
   openCreateWorkspace: () => void;
+  workspacesError: boolean;
+  refetchWorkspaces: () => void;
 };
 
 export const useWorkspaceShell = () => {
@@ -19,29 +21,51 @@ export const useWorkspaceShell = () => {
   const navigate = useNavigate();
   const { workspaceId } = useParams<{ workspaceId?: string }>();
   const activeWorkspaceId = useAppSelector(selectActiveWorkspaceId);
-  const { data: workspaces = [], isLoading, isFetching } = useGetWorkspacesQuery();
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isError,
+    isSuccess,
+    refetch,
+  } = useGetWorkspacesQuery();
+  const workspaces = useMemo(() => data ?? [], [data]);
   const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
+    if (!isSuccess) return;
+
     if (workspaceId) {
       dispatch(setActiveWorkspaceId(workspaceId));
       return;
     }
 
-    if (!isLoading && workspaces.length > 0 && !activeWorkspaceId) {
+    if (workspaces.length > 0 && !activeWorkspaceId) {
       const firstId = workspaces[0].id;
       dispatch(setActiveWorkspaceId(firstId));
       navigate(`/workspaces/${firstId}`, { replace: true });
     }
-  }, [workspaceId, workspaces, isLoading, activeWorkspaceId, dispatch, navigate]);
+  }, [
+    workspaceId,
+    workspaces,
+    isSuccess,
+    activeWorkspaceId,
+    dispatch,
+    navigate,
+  ]);
 
   useEffect(() => {
-    if (!workspaceId || isLoading) return;
+    if (!workspaceId || !isSuccess) return;
     const exists = workspaces.some((w) => w.id === workspaceId);
-    if (!exists && workspaces.length > 0) {
-      navigate(`/workspaces/${workspaces[0].id}`, { replace: true });
+    if (!exists) {
+      if (workspaces.length > 0) {
+        navigate(`/workspaces/${workspaces[0].id}`, { replace: true });
+      } else {
+        dispatch(setActiveWorkspaceId(null));
+        navigate('/', { replace: true });
+      }
     }
-  }, [workspaceId, workspaces, isLoading, navigate]);
+  }, [workspaceId, workspaces, isSuccess, navigate, dispatch]);
 
   const activeWorkspace = useMemo(
     () => workspaces.find((w) => w.id === (workspaceId || activeWorkspaceId)) ?? null,
@@ -64,8 +88,12 @@ export const useWorkspaceShell = () => {
   return {
     workspaces,
     activeWorkspace,
-    isBootstrapping: isLoading && workspaces.length === 0,
-    isLoadingWorkspaces: isFetching && workspaces.length === 0,
+    isBootstrapping: isLoading && !data && !isError,
+    isLoadingWorkspaces: isFetching && workspaces.length === 0 && !isError,
+    isWorkspacesError: isError,
+    refetchWorkspaces: () => {
+      void refetch();
+    },
     createOpen,
     openCreateWorkspace,
     closeCreateWorkspace,
@@ -75,6 +103,10 @@ export const useWorkspaceShell = () => {
       workspace: activeWorkspace,
       workspaces,
       openCreateWorkspace,
+      workspacesError: isError,
+      refetchWorkspaces: () => {
+        void refetch();
+      },
     } satisfies WorkspaceOutletContext,
   };
 };

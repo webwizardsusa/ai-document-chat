@@ -25,9 +25,27 @@ export const documentApi = baseApi.injectEndpoints({
       },
       invalidatesTags: (_result, _error, { workspaceId }) => [
         { type: API_TAGS.Document, id: `LIST-${workspaceId}` },
+        { type: API_TAGS.Workspace, id: 'LIST' },
+      ],
+    }),
+    deleteDocument: build.mutation<
+      null,
+      { workspaceId: string; documentId: string }
+    >({
+      query: ({ workspaceId, documentId }) => ({
+        url: `/workspaces/${workspaceId}/documents/${documentId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, { workspaceId }) => [
+        { type: API_TAGS.Document, id: `LIST-${workspaceId}` },
+        { type: API_TAGS.Workspace, id: 'LIST' },
       ],
     }),
   }),
 });
 
-export const { useGetDocumentsQuery, useUploadDocumentMutation } = documentApi;
+export const {
+  useGetDocumentsQuery,
+  useUploadDocumentMutation,
+  useDeleteDocumentMutation,
+} = documentApi;

@@ -1,6 +1,5 @@
-import { useEffect } from 'react';
 import { useGetDocumentsQuery } from '../api/documentApi';
-import type { DocumentStatus } from '../types/document';
+import type { Document, DocumentStatus } from '../types/document';
 
 export const documentStatusColor = (
   status: DocumentStatus,
@@ -22,24 +21,32 @@ export const documentStatusColor = (
 const isPendingStatus = (status: DocumentStatus) =>
   status === 'uploaded' || status === 'processing';
 
-export const useWorkspaceDocuments = (workspaceId: string) => {
-  const { data: documents = [], isLoading, isError, refetch } =
-    useGetDocumentsQuery(workspaceId);
+/** Shared documents query with single polling subscription while processing. */
+export const useDocumentsQuery = (workspaceId: string | null | undefined) => {
+  const skip = !workspaceId;
+  const { data, isLoading, isError, isSuccess, isFetching, refetch } =
+    useGetDocumentsQuery(workspaceId ?? '', { skip });
 
-  const hasPending = documents.some((doc) => isPendingStatus(doc.status));
+  const documents: Document[] = data ?? [];
+  const shouldPoll = !skip && documents.some((doc) => isPendingStatus(doc.status));
 
-  useEffect(() => {
-    if (!hasPending) return;
-    const timer = window.setInterval(() => {
-      void refetch();
-    }, 3000);
-    return () => window.clearInterval(timer);
-  }, [hasPending, refetch]);
+  useGetDocumentsQuery(workspaceId ?? '', {
+    skip: skip || !shouldPoll,
+    pollingInterval: shouldPoll ? 3000 : 0,
+  });
 
   return {
     documents,
-    isLoading,
-    isError,
-    isEmpty: !isLoading && !isError && documents.length === 0,
+    isLoading: Boolean(isLoading && !data),
+    isFetching,
+    isError: Boolean(isError),
+    isSuccess: Boolean(isSuccess),
+    isEmpty: Boolean(isSuccess && documents.length === 0),
+    hasPending: shouldPoll,
+    hasReadyDocument: documents.some((d) => d.status === 'ready'),
+    hasFailedDocument: documents.some((d) => d.status === 'failed'),
+    refetch,
   };
 };
+
+export const useWorkspaceDocuments = (workspaceId: string) => useDocumentsQuery(workspaceId);

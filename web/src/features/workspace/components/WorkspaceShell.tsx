@@ -1,8 +1,9 @@
-import { Box } from '@mui/material';
+import { Box, Button, Typography } from '@mui/material';
 import { Outlet } from 'react-router';
 import { Spinner } from '@/shared/components';
 import { useWorkspaceShell } from '../hooks';
 import CreateWorkspaceDialog from './CreateWorkspaceDialog';
+import WorkspaceDocsSidebar from './WorkspaceDocsSidebar';
 import WorkspaceHeader from './WorkspaceHeader';
 import WorkspaceSidebar from './WorkspaceSidebar';
 
@@ -12,6 +13,8 @@ const WorkspaceShell = () => {
     activeWorkspace,
     isBootstrapping,
     isLoadingWorkspaces,
+    isWorkspacesError,
+    refetchWorkspaces,
     createOpen,
     openCreateWorkspace,
     closeCreateWorkspace,
@@ -22,6 +25,32 @@ const WorkspaceShell = () => {
 
   if (isBootstrapping) {
     return <Spinner />;
+  }
+
+  if (isWorkspacesError && workspaces.length === 0) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          p: 3,
+        }}
+      >
+        <Box sx={{ textAlign: 'center', maxWidth: 420 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+            Couldn’t load workspaces
+          </Typography>
+          <Typography color="textSecondary" sx={{ mb: 2 }}>
+            Check your connection and try again.
+          </Typography>
+          <Button variant="contained" onClick={refetchWorkspaces}>
+            Retry
+          </Button>
+        </Box>
+      </Box>
+    );
   }
 
   return (
@@ -35,7 +64,10 @@ const WorkspaceShell = () => {
           isLoadingWorkspaces={isLoadingWorkspaces}
         />
         <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <WorkspaceHeader title={activeWorkspace?.name} />
+          <WorkspaceHeader
+            title={activeWorkspace?.name}
+            showDocsToggle={Boolean(activeWorkspace)}
+          />
           <Box
             component="main"
             sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
@@ -44,6 +76,8 @@ const WorkspaceShell = () => {
           </Box>
         </Box>
       </Box>
+
+      <WorkspaceDocsSidebar workspaceId={activeWorkspace?.id ?? null} />
 
       <CreateWorkspaceDialog
         open={createOpen}

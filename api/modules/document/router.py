@@ -36,3 +36,14 @@ def upload_document(
         result=DocumentResponse.model_validate(document),
         status_code=201,
     )
+
+
+@router.delete("/workspaces/{workspace_id}/documents/{document_id}")
+def delete_document(
+    workspace_id: UUID,
+    document_id: UUID,
+    current_user: CurrentUserDep,
+    db: DbDep,
+):
+    DocumentService(db).delete(workspace_id, document_id, current_user)
+    return success(message="Document deleted successfully", result=None)
