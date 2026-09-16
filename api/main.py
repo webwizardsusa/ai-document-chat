@@ -8,7 +8,7 @@ from core.config import settings
 from core.db import engine
 from core.exceptions import register_exception_handlers
 from core.logging import RequestIdMiddleware
-from modules import auth
+from modules import auth, document, workspace
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,5 +51,7 @@ def ready(response: Response) -> dict[str, str]:
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router)
+api_router.include_router(workspace.router)
+api_router.include_router(document.router)
 
 app.include_router(api_router)

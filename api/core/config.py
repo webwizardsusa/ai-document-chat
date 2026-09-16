@@ -12,7 +12,6 @@ class Settings(BaseSettings):
     APP_ENV: Literal["local", "development", "staging", "production"] = "local"
     FRONTEND_URL: str
     DATABASE_URL: str
-    STORAGE_TYPE: Literal["local", "s3"] = "local"
     STORAGE_ROOT: Path = Path("uploads")
 
     JWT_SECRET_KEY: SecretStr = Field(min_length=32)
@@ -25,7 +24,14 @@ class Settings(BaseSettings):
     REFRESH_COOKIE_SECURE: bool = False
     REFRESH_COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"
 
+    OPENAI_API_KEY: SecretStr | None = None
     EMBEDDING_MODEL: str = "text-embedding-3-small"
+    CHUNK_SIZE: int = 1000
+    CHUNK_OVERLAP: int = 200
+    EMBEDDING_BATCH_SIZE: int = 64
+
+    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -40,6 +46,13 @@ class Settings(BaseSettings):
     @property
     def jwt_secret(self) -> str:
         return self.JWT_SECRET_KEY.get_secret_value()
+
+    @property
+    def openai_api_key(self) -> str | None:
+        if self.OPENAI_API_KEY is None:
+            return None
+        value = self.OPENAI_API_KEY.get_secret_value().strip()
+        return value or None
 
     @model_validator(mode="after")
     def reject_weak_jwt_in_non_local(self) -> "Settings":

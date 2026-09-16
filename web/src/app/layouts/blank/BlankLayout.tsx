@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router';
-import LoadingBar from '../full/LoadingBar';
+import LoadingBar from './LoadingBar';
 
 const BlankLayout = () => (
   <>

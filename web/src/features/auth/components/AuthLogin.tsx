@@ -1,13 +1,7 @@
 import { Alert, Box, Button, Stack, Typography } from '@mui/material';
 import type { ReactNode } from 'react';
-import { useForm } from 'react-hook-form';
-import { yupResolver } from '@hookform/resolvers/yup';
-import { useLocation, useNavigate } from 'react-router';
-import { useAppDispatch } from '@/app/store';
 import { CustomFormLabel, CustomTextField } from '@/shared/components';
-import { useLoginMutation } from '../api/authApi';
-import { loginSchema, type LoginSchema } from '../schema/loginSchema';
-import { setCredentials } from '../slices/authSlice';
+import { useAuthLogin } from '../hooks';
 
 type AuthLoginProps = {
   title?: string;
@@ -15,37 +9,7 @@ type AuthLoginProps = {
 };
 
 const AuthLogin = ({ title, subtext }: AuthLoginProps) => {
-  const dispatch = useAppDispatch();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [login, { isLoading, error, reset }] = useLoginMutation();
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginSchema>({
-    defaultValues: { email: '', password: '' },
-    resolver: yupResolver(loginSchema),
-  });
-
-  const onSubmit = async (values: LoginSchema) => {
-    try {
-      const result = await login(values).unwrap();
-      dispatch(setCredentials(result));
-      const fromQuery = new URLSearchParams(location.search).get('from');
-      const fromState = (location.state as { from?: string } | null)?.from;
-      const candidate = fromQuery || fromState || '/';
-      const redirectTo =
-        candidate.startsWith('/') && !candidate.startsWith('//') ? candidate : '/';
-      navigate(redirectTo, { replace: true });
-    } catch {
-      // error rendered from mutation state
-    }
-  };
-
-  const apiError =
-    error && typeof error === 'object' && 'data' in error ? String(error.data) : null;
+  const { register, errors, onSubmit, isLoading, apiError, clearError } = useAuthLogin();
 
   return (
     <>
@@ -58,12 +22,12 @@ const AuthLogin = ({ title, subtext }: AuthLoginProps) => {
       {subtext}
 
       {apiError ? (
-        <Alert severity="error" sx={{ mt: 2, mb: 1 }} onClose={() => reset()}>
+        <Alert severity="error" sx={{ mt: 2, mb: 1 }} onClose={clearError}>
           {apiError}
         </Alert>
       ) : null}
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
+      <form onSubmit={onSubmit} noValidate>
         <Stack sx={{ mb: 2, mt: apiError || title ? 0 : 2 }}>
           <Box>
             <CustomFormLabel htmlFor="email">Email</CustomFormLabel>

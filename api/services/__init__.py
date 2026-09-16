@@ -1,1 +1,1 @@
-"""Shared service layer (storage, parsers, embeddings, RAG)."""
+"""Shared service layer (storage, parsers, chunking, embeddings, document processing)."""

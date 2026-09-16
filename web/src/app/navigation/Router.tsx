@@ -8,18 +8,26 @@ const lazyPage = (loader: () => Promise<{ default: ComponentType }>) => Loadable
 const BlankLayout = lazyPage(() => import('@/app/layouts/blank/BlankLayout'));
 const Login = lazyPage(() => import('@/features/auth/pages/Login'));
 const Error = lazyPage(() => import('@/features/auth/pages/Error'));
-const HomePage = lazyPage(() => import('@/features/home/pages/HomePage'));
+const WorkspaceShell = lazyPage(
+  () => import('@/features/workspace/components/WorkspaceShell'),
+);
+const WorkspacePage = lazyPage(() => import('@/features/workspace/pages/WorkspacePage'));
 
 const routes = [
   {
     element: <ProtectedRoute />,
     children: [
       {
-        path: '/',
         element: <BlankLayout />,
         children: [
-          { index: true, element: <HomePage /> },
-          { path: '*', element: <Navigate to="/" replace /> },
+          {
+            element: <WorkspaceShell />,
+            children: [
+              { path: '/', element: <WorkspacePage /> },
+              { path: '/workspaces/:workspaceId', element: <WorkspacePage /> },
+              { path: '*', element: <Navigate to="/" replace /> },
+            ],
+          },
         ],
       },
     ],

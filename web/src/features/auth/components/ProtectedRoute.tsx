@@ -1,16 +1,10 @@
-import { Navigate, Outlet, useLocation } from 'react-router';
+import { Navigate, Outlet } from 'react-router';
 import { Spinner } from '@/shared/components';
-import { useAppSelector } from '@/app/store';
-import { useMeQuery } from '../api/authApi';
-import {
-  selectAuthInitialized,
-  selectIsAuthenticated,
-} from '../slices/authSlice';
+import { useGuestRoute, useProtectedRoute } from '../hooks';
 
 /** Redirects authenticated users away from guest-only routes (e.g. login). */
 export const GuestRoute = () => {
-  const initialized = useAppSelector(selectAuthInitialized);
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const { initialized, isAuthenticated } = useGuestRoute();
 
   if (!initialized) {
     return <Spinner />;
@@ -24,18 +18,14 @@ export const GuestRoute = () => {
 };
 
 const ProtectedRoute = () => {
-  const initialized = useAppSelector(selectAuthInitialized);
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  const location = useLocation();
-
-  useMeQuery(undefined, { skip: !isAuthenticated });
+  const { initialized, isAuthenticated, fromPath } = useProtectedRoute();
 
   if (!initialized) {
     return <Spinner />;
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/auth/login" replace state={{ from: location.pathname }} />;
+    return <Navigate to="/auth/login" replace state={{ from: fromPath }} />;
   }
 
   return <Outlet />;
