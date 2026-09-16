@@ -1,1 +1,8 @@
 .cursor
+.env
+*.local
+**/uploads/
+**/__pycache__/
+**/.venv/
+**/node_modules/
+**/dist/
