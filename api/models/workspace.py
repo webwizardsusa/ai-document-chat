@@ -9,6 +9,8 @@ from .base import Base
 
 
 class Workspace(Base):
+    """Per-user container for documents and chat messages."""
+
     __tablename__ = "workspaces"
 
     id: Mapped[UUID] = mapped_column(

@@ -3,6 +3,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { useLocation, useNavigate } from 'react-router';
 import { useAppDispatch } from '@/app/store';
 import { broadcastCredentials } from '@/features/auth/authSync';
+import { getErrorMessage } from '@/shared/utils';
 import { useLoginMutation } from '../api/authApi';
 import { loginSchema, type LoginSchema } from '../schema/loginSchema';
 import { setCredentials } from '../slices/authSlice';
@@ -18,8 +19,7 @@ export const useAuthLogin = () => {
     resolver: yupResolver(loginSchema),
   });
 
-  const apiError =
-    error && typeof error === 'object' && 'data' in error ? String(error.data) : null;
+  const apiError = error ? getErrorMessage(error) : null;
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {

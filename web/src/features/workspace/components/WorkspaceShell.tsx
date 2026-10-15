@@ -1,7 +1,7 @@
 import { Box, Button, Typography } from '@mui/material';
 import { Outlet } from 'react-router';
 import { Spinner } from '@/shared/components';
-import { useWorkspaceShell } from '../hooks';
+import { useDeleteWorkspace, useWorkspaceShell } from '../hooks';
 import CreateWorkspaceDialog from './CreateWorkspaceDialog';
 import WorkspaceDocsSidebar from './WorkspaceDocsSidebar';
 import WorkspaceHeader from './WorkspaceHeader';
@@ -22,6 +22,7 @@ const WorkspaceShell = () => {
     onWorkspaceCreated,
     outletContext,
   } = useWorkspaceShell();
+  const { deletingId, onDelete } = useDeleteWorkspace({ workspaces });
 
   if (isBootstrapping) {
     return <Spinner />;
@@ -61,6 +62,8 @@ const WorkspaceShell = () => {
           activeWorkspaceId={activeWorkspace?.id ?? null}
           onSelectWorkspace={selectWorkspace}
           onCreateWorkspace={openCreateWorkspace}
+          onDeleteWorkspace={(id, name) => void onDelete(id, name)}
+          deletingWorkspaceId={deletingId}
           isLoadingWorkspaces={isLoadingWorkspaces}
         />
         <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>

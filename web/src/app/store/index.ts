@@ -9,6 +9,7 @@ import workspaceUiReducer from '@/features/workspace/slices/workspaceSlice';
 import '@/features/auth/api/authApi';
 import '@/features/workspace/api/workspaceApi';
 import '@/features/document/api/documentApi';
+import '@/features/chat/api/chatApi';
 
 export const store = configureStore({
   reducer: {

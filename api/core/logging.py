@@ -1,3 +1,5 @@
+"""Request ID + timing middleware for production logs."""
+
 import logging
 import time
 import uuid
@@ -11,6 +13,8 @@ logger = logging.getLogger("api.request")
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
+    """Attach X-Request-ID and log method/path/status/duration."""
+
     async def dispatch(self, request: Request, call_next) -> Response:
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
         request.state.request_id = request_id

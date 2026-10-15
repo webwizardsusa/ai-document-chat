@@ -19,6 +19,8 @@ from .constants import VECTOR_DIMENSION
 
 
 class DocumentChunk(Base):
+    """Embedded text slice used for RAG retrieval (pgvector)."""
+
     __tablename__ = "document_chunks"
     __table_args__ = (
         UniqueConstraint(

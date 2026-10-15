@@ -9,6 +9,8 @@ from .base import Base
 
 
 class AuthSession(Base):
+    """Hashed refresh-token session; rotated on each /auth/refresh."""
+
     __tablename__ = "auth_sessions"
 
     id: Mapped[UUID] = mapped_column(

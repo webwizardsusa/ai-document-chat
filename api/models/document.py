@@ -19,6 +19,8 @@ from .enums import DocumentStatus
 
 
 class Document(Base):
+    """Uploaded file metadata; binary lives on disk via storage_key."""
+
     __tablename__ = "documents"
     __table_args__ = (
         CheckConstraint(

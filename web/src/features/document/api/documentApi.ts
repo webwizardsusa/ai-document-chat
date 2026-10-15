@@ -44,6 +44,10 @@ export const documentApi = baseApi.injectEndpoints({
   }),
 });
 
+/** Authenticated download path (blob fetch lives in useDownloadDocument). */
+export const documentDownloadPath = (workspaceId: string, documentId: string) =>
+  `/workspaces/${workspaceId}/documents/${documentId}/download`;
+
 export const {
   useGetDocumentsQuery,
   useUploadDocumentMutation,

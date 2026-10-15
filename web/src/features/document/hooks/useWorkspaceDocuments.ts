@@ -1,27 +1,10 @@
 import { useGetDocumentsQuery } from '../api/documentApi';
 import type { Document, DocumentStatus } from '../types/document';
 
-export const documentStatusColor = (
-  status: DocumentStatus,
-): 'default' | 'info' | 'warning' | 'success' | 'error' => {
-  switch (status) {
-    case 'ready':
-      return 'success';
-    case 'processing':
-      return 'info';
-    case 'uploaded':
-      return 'warning';
-    case 'failed':
-      return 'error';
-    default:
-      return 'default';
-  }
-};
-
 const isPendingStatus = (status: DocumentStatus) =>
   status === 'uploaded' || status === 'processing';
 
-/** Shared documents query with single polling subscription while processing. */
+/** Shared documents query; polls while any doc is uploaded/processing. */
 export const useDocumentsQuery = (workspaceId: string | null | undefined) => {
   const skip = !workspaceId;
   const { data, isLoading, isError, isSuccess, isFetching, refetch } =

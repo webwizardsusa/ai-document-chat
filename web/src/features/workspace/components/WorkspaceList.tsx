@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  IconButton,
   List,
   ListItemButton,
   ListItemIcon,
@@ -9,6 +10,7 @@ import {
 } from '@mui/material';
 import {
   Add as AddIcon,
+  DeleteOutlined as DeleteIcon,
   FolderOutlined as FolderIcon,
 } from '@mui/icons-material';
 import type { Workspace } from '../types/workspace';
@@ -18,6 +20,8 @@ type Props = {
   activeId: string | null;
   onSelect: (id: string) => void;
   onCreate: () => void;
+  onDelete?: (id: string, name: string) => void;
+  deletingId?: string | null;
   isLoading?: boolean;
 };
 
@@ -26,6 +30,8 @@ const WorkspaceList = ({
   activeId,
   onSelect,
   onCreate,
+  onDelete,
+  deletingId,
   isLoading,
 }: Props) => (
   <Box
@@ -100,6 +106,8 @@ const WorkspaceList = ({
                 borderRadius: 2,
                 px: 1.25,
                 py: 1,
+                pr: onDelete ? 5 : 1.25,
+                position: 'relative',
                 '&.Mui-selected': {
                   bgcolor: 'primary.light',
                   '&:hover': { bgcolor: 'primary.light' },
@@ -130,6 +138,27 @@ const WorkspaceList = ({
                   },
                 }}
               />
+              {onDelete ? (
+                <IconButton
+                  size="small"
+                  aria-label={`Delete ${workspace.name}`}
+                  disabled={deletingId === workspace.id}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDelete(workspace.id, workspace.name);
+                  }}
+                  sx={{
+                    position: 'absolute',
+                    right: 6,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'error.main',
+                    opacity: selected ? 1 : 0.55,
+                  }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              ) : null}
             </ListItemButton>
           );
         })}

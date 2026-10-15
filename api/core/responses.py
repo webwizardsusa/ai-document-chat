@@ -1,3 +1,5 @@
+"""Standard JSON envelope helpers: {status, message, result, errors}."""
+
 from typing import Any, Mapping
 
 from fastapi.encoders import jsonable_encoder
@@ -39,48 +41,35 @@ def success(result=None, message="Success", status_code=200, headers=None):
 
 
 def error(message="Error", status_code=400, result=None, errors=None, headers=None):
+    # Allow non-string message to become the errors payload.
+    if isinstance(message, str):
+        return api_response(
+            success=False,
+            message=message,
+            result=result,
+            errors=errors,
+            status_code=status_code,
+            headers=headers,
+        )
     return api_response(
         success=False,
-        message=message if isinstance(message, str) else "Error",
+        message="Error",
         result=result,
-        errors=errors if errors is not None else (
-            message if not isinstance(message, str) else None
-        ),
+        errors=errors if errors is not None else message,
         status_code=status_code,
         headers=headers,
     )
 
 
 def unprocessable(message="Validation failed", errors=None, result=None, headers=None):
-    return api_response(
-        success=False,
-        message=message if isinstance(message, str) else "Validation failed",
-        result=result,
-        errors=errors if errors is not None else (
-            message if not isinstance(message, str) else None
-        ),
+    return error(
+        message=message,
         status_code=422,
+        result=result,
+        errors=errors,
         headers=headers,
     )
 
 
 def internal_error(message="Internal Server Error", headers=None):
-    return api_response(
-        success=False,
-        message=message,
-        result=None,
-        errors=None,
-        status_code=500,
-        headers=headers,
-    )
-
-
-def not_found(message="Not Found", headers=None):
-    return api_response(
-        success=False,
-        message=message,
-        result=None,
-        errors=None,
-        status_code=404,
-        headers=headers,
-    )
+    return error(message=message, status_code=500, headers=headers)

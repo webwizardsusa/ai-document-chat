@@ -3,17 +3,13 @@ Seed a single local/dev user.
 
 Usage (from api/):
   python -m seeders.seed_user
-
-Credentials (printed on success):
-  email:    admin@example.com
-  password: Admin@12345
 """
 
-from sqlalchemy import select
-
+from core.config import settings
 from core.db import SessionLocal
 from core.security import hash_password, normalize_email
 from models.user import User
+from sqlalchemy import select
 
 SEED_NAME = "Admin User"
 SEED_EMAIL = "admin@example.com"
@@ -21,6 +17,9 @@ SEED_PASSWORD = "Admin@12345"
 
 
 def seed_user() -> None:
+    if settings.APP_ENV != "local":
+        raise SystemExit("Refusing to seed users when APP_ENV is not local")
+
     email = normalize_email(SEED_EMAIL)
     db = SessionLocal()
     try:

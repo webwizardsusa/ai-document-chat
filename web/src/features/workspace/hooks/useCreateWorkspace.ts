@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { getErrorMessage } from '@/shared/utils';
 import { useCreateWorkspaceMutation } from '../api/workspaceApi';
 
 type Options = {
@@ -10,8 +11,7 @@ export const useCreateWorkspace = ({ onClose, onCreated }: Options) => {
   const [name, setName] = useState('');
   const [createWorkspace, { isLoading, error, reset }] = useCreateWorkspaceMutation();
 
-  const apiError =
-    error && typeof error === 'object' && 'data' in error ? String(error.data) : null;
+  const apiError = error ? getErrorMessage(error) : null;
 
   const handleClose = () => {
     setName('');

@@ -15,13 +15,14 @@ _WEAK_JWT_SECRETS = frozenset(
         "secret",
         "local-dev-only-change-me-32chars-min",
         "replace-with-a-unique-random-secret-at-least-32-chars",
-        # Historical value from an older .env.example — treat as public.
         "BFwiMx8o59jwmWmOh8ADiHuKc7NmAV8qJKjpr0D8ahxv5d5TbpFt1eYcM2e4ymAB",
     }
 )
 
 
 class Settings(BaseSettings):
+    """App settings loaded from env / .env. Prefer absolute STORAGE_ROOT in all envs."""
+
     APP_ENV: Literal["local", "development", "staging", "production"] = "local"
     FRONTEND_URL: str
     DATABASE_URL: str
@@ -39,12 +40,30 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: SecretStr | None = None
     EMBEDDING_MODEL: str = "text-embedding-3-small"
+    CHAT_MODEL: str = "gpt-4o-mini"
+    # Character counts for LangChain splitter (not tokens).
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 200
     EMBEDDING_BATCH_SIZE: int = 64
+    RAG_TOP_K: int = 5
+    # Reclaim Celery jobs stuck in "running" after a worker crash.
+    JOB_STALE_MINUTES: int = 30
+    # Beat reaper: re-enqueue abandoned PENDING, then fail if still stuck.
+    JOB_PENDING_REENQUEUE_MINUTES: int = 5
+    JOB_PENDING_FAIL_MINUTES: int = 120
+    JOB_REAPER_INTERVAL_SECONDS: int = 60
 
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
+
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_RECYCLE: int = 1800
+
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_AUTH_PER_MINUTE: int = 20
+    RATE_LIMIT_CHAT_PER_MINUTE: int = 30
+    RATE_LIMIT_UPLOAD_PER_MINUTE: int = 10
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -69,12 +88,16 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_security_settings(self) -> "Settings":
-        if self.REFRESH_COOKIE_SAMESITE == "none" and not (
-            self.REFRESH_COOKIE_SECURE or self.APP_ENV != "local"
-        ):
+        # API + Celery must share the same absolute upload root.
+        object.__setattr__(self, "STORAGE_ROOT", self.STORAGE_ROOT.expanduser().resolve())
+
+        if self.CHUNK_OVERLAP >= self.CHUNK_SIZE:
+            raise ValueError("CHUNK_OVERLAP must be smaller than CHUNK_SIZE")
+
+        # Browsers require Secure when SameSite=None.
+        if self.REFRESH_COOKIE_SAMESITE == "none" and not self.REFRESH_COOKIE_SECURE:
             raise ValueError(
-                "REFRESH_COOKIE_SAMESITE=none requires a Secure cookie "
-                "(set REFRESH_COOKIE_SECURE=true or use a non-local APP_ENV)"
+                "REFRESH_COOKIE_SAMESITE=none requires REFRESH_COOKIE_SECURE=true"
             )
 
         if self.APP_ENV != "local" and self.jwt_secret in _WEAK_JWT_SECRETS:

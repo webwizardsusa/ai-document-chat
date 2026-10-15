@@ -1,3 +1,5 @@
+"""Document API schemas and upload limits."""
+
 from datetime import datetime
 from uuid import UUID
 

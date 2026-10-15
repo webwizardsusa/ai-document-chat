@@ -6,7 +6,7 @@ from core.config import settings
 
 
 class LocalStorage:
-    """Store files under STORAGE_ROOT. Never expose this path publicly."""
+    """Store files under absolute STORAGE_ROOT. Never expose this path publicly."""
 
     def __init__(self, root: Path | None = None):
         self.root = (root or settings.STORAGE_ROOT).resolve()
@@ -22,6 +22,7 @@ class LocalStorage:
         return f"{workspace_id}/{document_id}/{safe_name}"
 
     def absolute_path(self, storage_key: str) -> Path:
+        # Reject traversal; require resolved path under STORAGE_ROOT.
         if not storage_key or storage_key.startswith("/") or ".." in Path(storage_key).parts:
             raise ValueError("Invalid storage key")
         path = (self.root / storage_key).resolve()
@@ -46,6 +47,15 @@ class LocalStorage:
         path = self.absolute_path(storage_key)
         if path.is_file():
             path.unlink()
+
+    def delete_quiet(self, storage_key: str | None) -> None:
+        """Best-effort delete; ignore missing/invalid keys (post-commit cleanup)."""
+        if not storage_key or storage_key == "pending":
+            return
+        try:
+            self.delete(storage_key)
+        except (OSError, ValueError):
+            pass
 
 
 def file_sha256(data: bytes) -> str:

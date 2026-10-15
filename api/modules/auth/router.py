@@ -1,8 +1,11 @@
+"""Auth HTTP routes: JWT access in body, refresh in HttpOnly cookie."""
+
 from fastapi import APIRouter, HTTPException, Request, status
 
 from core.config import settings
 from core.cookies import clear_refresh_cookie, set_refresh_cookie
 from core.deps import CurrentUserDep, DbDep
+from core.rate_limit import AuthRateLimitDep
 from core.responses import success
 from modules.auth.schema import (
     AuthResponse,
@@ -18,6 +21,7 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 def _auth_body(result: dict) -> dict:
+    """Public auth payload — refresh token is cookie-only, not in JSON."""
     return AuthResponse(
         user=UserResponse.model_validate(result["user"]),
         access_token=result["access_token"],
@@ -28,13 +32,14 @@ def _resolve_refresh_token(
     request: Request,
     payload: RefreshRequest | LogoutRequest | None,
 ) -> str | None:
+    # Prefer body override (tests/clients); default to cookie.
     if payload and payload.refresh_token:
         return payload.refresh_token
     return request.cookies.get(settings.REFRESH_COOKIE_NAME)
 
 
 @router.post("/login")
-def login(payload: LoginRequest, db: DbDep):
+def login(payload: LoginRequest, db: DbDep, _rate_limit: AuthRateLimitDep):
     result = AuthService(db).login(payload)
     response = success(message="Login successful", result=_auth_body(result))
     set_refresh_cookie(response, result["refresh_token"])
@@ -42,7 +47,7 @@ def login(payload: LoginRequest, db: DbDep):
 
 
 @router.post("/register")
-def register(payload: RegisterRequest, db: DbDep):
+def register(payload: RegisterRequest, db: DbDep, _rate_limit: AuthRateLimitDep):
     result = AuthService(db).register(payload)
     response = success(message="Registration successful", result=_auth_body(result))
     set_refresh_cookie(response, result["refresh_token"])

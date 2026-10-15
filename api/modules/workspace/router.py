@@ -1,3 +1,5 @@
+"""Workspace CRUD routes (scoped to current user)."""
+
 from uuid import UUID
 
 from fastapi import APIRouter
@@ -44,3 +46,13 @@ def get_workspace(
         message="Workspace fetched successfully",
         result=workspace,
     )
+
+
+@router.delete("/{workspace_id}")
+def delete_workspace(
+    workspace_id: UUID,
+    current_user: CurrentUserDep,
+    db: DbDep,
+):
+    WorkspaceService(db).delete(workspace_id, current_user)
+    return success(message="Workspace deleted successfully", result=None)

@@ -1,10 +1,11 @@
-import { Box, Button, Stack, TextField, Typography } from '@mui/material';
-import {
-  DescriptionOutlined as DocIcon,
-  Send as SendIcon,
-} from '@mui/icons-material';
+import { Box, Button, IconButton, Stack, Tooltip, Typography } from '@mui/material';
+import { DeleteOutline as ClearChatIcon } from '@mui/icons-material';
 import { PageContainer } from '@/shared/components';
 import UploadDocumentButton from '@/features/document/components/UploadDocumentButton';
+import ChatComposer from '@/features/chat/components/ChatComposer';
+import ChatMessageList from '@/features/chat/components/ChatMessageList';
+import { useWorkspaceChat } from '@/features/chat/hooks';
+import WorkspaceEmptyState from '../components/WorkspaceEmptyState';
 import { useWorkspacePage } from '../hooks';
 
 const WorkspacePage = () => {
@@ -22,6 +23,11 @@ const WorkspacePage = () => {
     hasReadyDocument,
     hasFailedDocument,
   } = useWorkspacePage();
+
+  const chat = useWorkspaceChat({
+    workspaceId: selected?.id,
+    enabled: Boolean(selected && hasReadyDocument),
+  });
 
   if (workspacesError && !hasWorkspaces) {
     return (
@@ -50,42 +56,26 @@ const WorkspacePage = () => {
             p: 3,
           }}
         >
-          <Stack
-            spacing={2}
+          <Box
             sx={{
               maxWidth: 440,
               width: '100%',
-              textAlign: 'center',
               bgcolor: 'background.paper',
               borderRadius: 3,
               border: (theme) => `1px solid ${theme.palette.divider}`,
               p: 4,
             }}
           >
-            <Box
-              sx={{
-                width: 56,
-                height: 56,
-                borderRadius: 2,
-                bgcolor: 'primary.light',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mx: 'auto',
-              }}
-            >
-              <DocIcon color="primary" />
-            </Box>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-              Create your first workspace
-            </Typography>
-            <Typography color="textSecondary">
-              Workspaces hold your documents. Upload files there, then ask questions in chat.
-            </Typography>
-            <Button variant="contained" size="large" onClick={openCreateWorkspace}>
-              Create workspace
-            </Button>
-          </Stack>
+            <WorkspaceEmptyState
+              title="Create your first workspace"
+              description="Workspaces hold your documents. Upload files there, then ask questions in chat."
+              action={
+                <Button variant="contained" size="large" onClick={openCreateWorkspace}>
+                  Create workspace
+                </Button>
+              }
+            />
+          </Box>
         </Box>
       </PageContainer>
     );
@@ -113,170 +103,164 @@ const WorkspacePage = () => {
     );
   }
 
+  const showChat = hasReadyDocument;
+
   return (
     <PageContainer title={selected.name} description="Workspace chat">
       <Box
         sx={{
           flex: 1,
+          height: '100%',
+          minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
-          minHeight: 0,
-          bgcolor: 'background.paper',
+          bgcolor: '#FFFFFF',
         }}
       >
-        <Box
-          sx={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            p: 3,
-          }}
-        >
-          {docsLoading ? (
-            <Typography color="textSecondary">Loading documents...</Typography>
-          ) : docsError ? (
-            <Stack spacing={2} sx={{ maxWidth: 420, textAlign: 'center' }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Couldn’t load documents
-              </Typography>
-              <Typography color="textSecondary">
-                Something went wrong while fetching documents for this workspace.
-              </Typography>
-              <Box sx={{ alignSelf: 'center' }}>
-                <Button variant="contained" onClick={() => void refetchDocuments()}>
+        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          {showChat ? (
+            chat.isError ? (
+              <Box
+                sx={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  p: 3,
+                  textAlign: 'center',
+                }}
+              >
+                <Typography color="textSecondary" sx={{ mb: 2 }}>
+                  Couldn’t load messages.
+                </Typography>
+                <Button variant="contained" onClick={chat.refetchMessages}>
                   Retry
                 </Button>
               </Box>
-            </Stack>
-          ) : !hasDocuments ? (
-            <Stack spacing={2} sx={{ maxWidth: 480, textAlign: 'center' }}>
-              <Box
-                sx={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 2,
-                  bgcolor: 'primary.light',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  mx: 'auto',
-                }}
-              >
-                <DocIcon color="primary" sx={{ fontSize: 32 }} />
-              </Box>
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                This workspace has no documents yet
-              </Typography>
-              <Typography color="textSecondary">
-                Upload a PDF, TXT, or MD file for <strong>{selected.name}</strong>, then ask
-                questions about it.
-              </Typography>
-              <Box sx={{ alignSelf: 'center' }}>
-                <UploadDocumentButton
-                  workspaceId={selected.id}
-                  variant="contained"
-                  size="large"
-                  label="Upload document"
+            ) : (
+              <>
+                {(chat.messages.length > 0 || chat.pendingUser) && (
+                  <Box
+                    sx={{
+                      px: { xs: 2, sm: 3 },
+                      pt: 1.5,
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                    }}
+                  >
+                    <Tooltip title="Clear chat history">
+                      <span>
+                        <IconButton
+                          size="small"
+                          aria-label="Clear chat history"
+                          onClick={() => void chat.onClearHistory()}
+                          disabled={chat.isClearing || chat.isSending}
+                        >
+                          <ClearChatIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </Box>
+                )}
+                <ChatMessageList
+                  messages={chat.messages}
+                  pendingUser={chat.pendingUser}
+                  streamingText={chat.streamingText}
+                  isLoading={chat.isLoading}
+                  isSending={chat.isSending}
+                  listRef={chat.listRef}
                 />
-              </Box>
-            </Stack>
-          ) : hasFailedDocument && !hasReadyDocument ? (
-            <Stack spacing={1.5} sx={{ maxWidth: 480, textAlign: 'center' }}>
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                Document processing failed
-              </Typography>
-              <Typography color="textSecondary">
-                Open the documents panel for details, or upload the file again.
-              </Typography>
-              <Box sx={{ alignSelf: 'center' }}>
-                <UploadDocumentButton
-                  workspaceId={selected.id}
-                  variant="contained"
-                  size="medium"
-                  label="Upload again"
-                />
-              </Box>
-            </Stack>
-          ) : !hasReadyDocument ? (
-            <Stack spacing={1.5} sx={{ maxWidth: 480, textAlign: 'center' }}>
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                Documents are being prepared
-              </Typography>
-              <Typography color="textSecondary">
-                Your files are uploaded. Processing will make them ready for questions.
-              </Typography>
-              <Box sx={{ alignSelf: 'center' }}>
-                <UploadDocumentButton
-                  workspaceId={selected.id}
-                  variant="outlined"
-                  size="medium"
-                  label="Upload another"
-                />
-              </Box>
-            </Stack>
+              </>
+            )
           ) : (
-            <Typography color="textSecondary">
-              Ask a question about your documents below.
-            </Typography>
+            <Box
+              sx={{
+                flex: 1,
+                minHeight: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                p: 3,
+              }}
+            >
+              {docsLoading ? (
+                <Typography color="textSecondary">Loading documents...</Typography>
+              ) : docsError ? (
+                <Stack spacing={2} sx={{ maxWidth: 420, textAlign: 'center', alignItems: 'center' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    Couldn’t load documents
+                  </Typography>
+                  <Typography color="textSecondary">
+                    Something went wrong while fetching documents for this workspace.
+                  </Typography>
+                  <Button variant="contained" onClick={() => void refetchDocuments()}>
+                    Retry
+                  </Button>
+                </Stack>
+              ) : !hasDocuments ? (
+                <WorkspaceEmptyState
+                  title="This workspace has no documents yet"
+                  description={
+                    <>
+                      Upload a PDF, TXT, or MD file for <strong>{selected.name}</strong>, then ask
+                      questions about it.
+                    </>
+                  }
+                  action={
+                    <UploadDocumentButton
+                      workspaceId={selected.id}
+                      variant="contained"
+                      size="large"
+                      label="Upload document"
+                    />
+                  }
+                />
+              ) : hasFailedDocument && !hasReadyDocument ? (
+                <WorkspaceEmptyState
+                  title="Document processing failed"
+                  description="Open the documents panel for details, or upload the file again."
+                  action={
+                    <UploadDocumentButton
+                      workspaceId={selected.id}
+                      variant="contained"
+                      size="medium"
+                      label="Upload again"
+                    />
+                  }
+                />
+              ) : (
+                <WorkspaceEmptyState
+                  title="Documents are being prepared"
+                  description="Your files are uploaded. Processing will make them ready for questions."
+                  action={
+                    <UploadDocumentButton
+                      workspaceId={selected.id}
+                      variant="outlined"
+                      size="medium"
+                      label="Upload another"
+                    />
+                  }
+                />
+              )}
+            </Box>
           )}
         </Box>
 
-        <Box
-          sx={{
-            borderTop: (theme) => `1px solid ${theme.palette.divider}`,
-            p: { xs: 1.5, sm: 2 },
-            bgcolor: 'background.paper',
-            width: '100%',
-          }}
-        >
-          <Box sx={{ position: 'relative', width: '100%' }}>
-            <TextField
-              fullWidth
-              placeholder={
-                hasReadyDocument
-                  ? 'Ask a question about your documents...'
-                  : 'Upload and wait for a ready document before asking...'
-              }
-              disabled={!hasReadyDocument}
-              multiline
-              maxRows={4}
-              sx={{
-                width: '100%',
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 3,
-                  bgcolor: 'grey.100',
-                  pr: 6,
-                },
-              }}
-            />
-            <Button
-              variant="contained"
-              disabled={!hasReadyDocument}
-              aria-label="Send"
-              sx={{
-                position: 'absolute',
-                right: 8,
-                bottom: 8,
-                minWidth: 40,
-                width: 40,
-                height: 40,
-                p: 0,
-                borderRadius: 2,
-              }}
-            >
-              <SendIcon fontSize="small" />
-            </Button>
-          </Box>
-          <Typography
-            variant="caption"
-            color="textSecondary"
-            sx={{ display: 'block', textAlign: 'center', mt: 1 }}
-          >
-            AI responses are generated from your workspace documents and may not always be 100%
-            accurate.
-          </Typography>
-        </Box>
+        <ChatComposer
+          draft={showChat ? chat.draft : ''}
+          setDraft={showChat ? chat.setDraft : () => undefined}
+          canSend={showChat ? chat.canSend : false}
+          isSending={showChat ? chat.isSending : false}
+          disabled={!showChat}
+          placeholder={
+            showChat
+              ? 'Ask a question about your documents...'
+              : 'Upload and wait for a ready document before asking...'
+          }
+          onSubmit={showChat ? chat.onSubmit : (e) => e.preventDefault()}
+          onComposerKeyDown={showChat ? chat.onComposerKeyDown : () => undefined}
+        />
       </Box>
     </PageContainer>
   );

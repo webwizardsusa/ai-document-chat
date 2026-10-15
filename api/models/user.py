@@ -9,6 +9,8 @@ from .base import Base
 
 
 class User(Base):
+    """Account that owns workspaces (and thus documents/messages)."""
+
     __tablename__ = "users"
 
     id: Mapped[UUID] = mapped_column(

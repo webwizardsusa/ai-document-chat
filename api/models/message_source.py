@@ -17,6 +17,8 @@ from .base import Base
 
 
 class MessageSource(Base):
+    """Citation linking an assistant message to a retrieved chunk."""
+
     __tablename__ = "message_sources"
     __table_args__ = (
         UniqueConstraint(

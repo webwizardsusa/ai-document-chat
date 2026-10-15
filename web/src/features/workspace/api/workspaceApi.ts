@@ -25,6 +25,18 @@ export const workspaceApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: [{ type: API_TAGS.Workspace, id: 'LIST' }],
     }),
+    deleteWorkspace: build.mutation<null, string>({
+      query: (workspaceId) => ({
+        url: `/workspaces/${workspaceId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, workspaceId) => [
+        { type: API_TAGS.Workspace, id: 'LIST' },
+        { type: API_TAGS.Workspace, id: workspaceId },
+        { type: API_TAGS.Document, id: `LIST-${workspaceId}` },
+        { type: API_TAGS.Message, id: `LIST-${workspaceId}` },
+      ],
+    }),
   }),
 });
 
@@ -32,4 +44,5 @@ export const {
   useGetWorkspacesQuery,
   useGetWorkspaceQuery,
   useCreateWorkspaceMutation,
+  useDeleteWorkspaceMutation,
 } = workspaceApi;

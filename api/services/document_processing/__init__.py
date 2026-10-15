@@ -3,25 +3,31 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import timedelta
 from uuid import UUID
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from core.config import settings
+from core.time import ensure_utc, utcnow
 from models.document import Document
 from models.document_chunk import DocumentChunk
 from models.enums import DocumentStatus, JobStatus
 from models.job import Job
 from services.chunking import split_document
 from services.embeddings import embed_texts
+from services.jobs import mark_job_failed
 from services.parsers import extract_text
 from services.storage import get_storage
 
 logger = logging.getLogger(__name__)
 
-USER_FACING_FAILURE = "Document processing failed. Please try uploading again."
+_CLAIMABLE = {
+    JobStatus.PENDING.value,
+    JobStatus.FAILED.value,
+    JobStatus.RUNNING.value,
+}
 
 
 class DocumentProcessor:
@@ -30,51 +36,48 @@ class DocumentProcessor:
         self.storage = get_storage()
 
     def process_job(self, job_id: UUID) -> dict:
-        job = self.db.scalar(
-            select(Job).where(Job.id == job_id).with_for_update()
-        )
+        """Claim a job, process the file, mark document ready/failed."""
+        job = self.db.scalar(select(Job).where(Job.id == job_id).with_for_update())
         if job is None:
             raise ValueError(f"Job not found: {job_id}")
 
         if job.status == JobStatus.COMPLETED.value:
             return {"skipped": True, "status": job.status}
 
-        # Another worker already claimed this job (acks_late redelivery).
-        if job.status == JobStatus.RUNNING.value:
+        # Fresh RUNNING = another worker owns it. Stale RUNNING = reclaim after crash.
+        if job.status == JobStatus.RUNNING.value and not self._is_stale_running(job):
             return {"skipped": True, "status": job.status}
 
-        if job.status not in {
-            JobStatus.PENDING.value,
-            JobStatus.FAILED.value,
-        }:
+        if job.status not in _CLAIMABLE:
             return {"skipped": True, "status": job.status}
+
+        if job.status == JobStatus.RUNNING.value:
+            logger.warning("Reclaiming stale running job %s", job_id)
 
         document_id = job.document_id
         if document_id is None and job.payload:
             raw = job.payload.get("document_id")
             document_id = UUID(str(raw)) if raw else None
         if document_id is None:
-            self._fail_job(job, "Job is missing document_id")
+            mark_job_failed(self.db, job, None, "Job is missing document_id")
             raise ValueError("Job is missing document_id")
 
         document = self.db.scalar(
             select(Document).where(Document.id == document_id).with_for_update()
         )
         if document is None:
-            self._fail_job(job, f"Document not found: {document_id}")
+            mark_job_failed(self.db, job, None, f"Document not found: {document_id}")
             raise ValueError(f"Document not found: {document_id}")
 
-        now = datetime.now(timezone.utc)
+        # Claim, then commit so locks are released before OpenAI I/O.
         job.status = JobStatus.RUNNING.value
-        job.started_at = now
+        job.started_at = utcnow()
         job.error = None
         document.status = DocumentStatus.PROCESSING.value
         document.error_message = None
-        # Release row locks before long-running parse/embed work.
         self.db.commit()
 
         try:
-            # Re-bind after commit (expire_on_commit=False keeps attrs; refresh ids).
             document = self.db.get(Document, document_id)
             job = self.db.get(Job, job_id)
             if document is None or job is None:
@@ -83,15 +86,26 @@ class DocumentProcessor:
             result = self._run(document)
             job.status = JobStatus.COMPLETED.value
             job.result = result
-            job.completed_at = datetime.now(timezone.utc)
+            job.completed_at = utcnow()
             job.error = None
             self.db.commit()
             return result
         except Exception as exc:
             logger.exception("Document processing failed for job %s", job_id)
             self.db.rollback()
-            self._mark_failed(job_id, document_id, str(exc))
+            mark_job_failed(
+                self.db,
+                self.db.get(Job, job_id),
+                self.db.get(Document, document_id),
+                str(exc),
+            )
             raise
+
+    def _is_stale_running(self, job: Job) -> bool:
+        if job.started_at is None:
+            return True
+        age = utcnow() - ensure_utc(job.started_at)
+        return age >= timedelta(minutes=max(1, settings.JOB_STALE_MINUTES))
 
     def _run(self, document: Document) -> dict:
         data = self.storage.read(document.storage_key)
@@ -103,6 +117,7 @@ class DocumentProcessor:
         chunks = split_document(extracted)
         embeddings = embed_texts([chunk.content for chunk in chunks])
 
+        # Replace any previous chunks (reprocess / reclaim).
         self.db.execute(
             delete(DocumentChunk).where(DocumentChunk.document_id == document.id)
         )
@@ -133,22 +148,3 @@ class DocumentProcessor:
             "page_count": extracted.page_count,
             "embedding_model": settings.EMBEDDING_MODEL,
         }
-
-    def _mark_failed(self, job_id: UUID, document_id: UUID, detail: str) -> None:
-        job = self.db.get(Job, job_id)
-        document = self.db.get(Document, document_id)
-        now = datetime.now(timezone.utc)
-        if job is not None:
-            job.status = JobStatus.FAILED.value
-            job.error = detail[:4000]
-            job.completed_at = now
-        if document is not None:
-            document.status = DocumentStatus.FAILED.value
-            document.error_message = USER_FACING_FAILURE
-        self.db.commit()
-
-    def _fail_job(self, job: Job, detail: str) -> None:
-        job.status = JobStatus.FAILED.value
-        job.error = detail[:4000]
-        job.completed_at = datetime.now(timezone.utc)
-        self.db.commit()

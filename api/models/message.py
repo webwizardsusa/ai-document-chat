@@ -9,6 +9,8 @@ from .base import Base
 
 
 class Message(Base):
+    """Chat turn: sender_type is user or assistant (no Q/A pairing table)."""
+
     __tablename__ = "messages"
     __table_args__ = (
         CheckConstraint(

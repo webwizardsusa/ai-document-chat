@@ -1,3 +1,5 @@
+"""Map exceptions to the standard API envelope."""
+
 import logging
 
 from fastapi import HTTPException, Request

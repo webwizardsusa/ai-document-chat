@@ -1,3 +1,5 @@
+"""String enums mirrored by DB CHECK constraints."""
+
 import enum
 
 

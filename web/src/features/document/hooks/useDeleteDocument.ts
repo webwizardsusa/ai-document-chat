@@ -1,4 +1,5 @@
 import { toast } from 'react-toastify';
+import { getErrorMessage } from '@/shared/utils';
 import { useDeleteDocumentMutation } from '../api/documentApi';
 
 type Options = {
@@ -14,20 +15,13 @@ export const useDeleteDocument = ({ workspaceId }: Options) => {
       : null;
 
   const onDelete = async (documentId: string, name?: string) => {
-    const confirmed = window.confirm(
-      name ? `Delete “${name}”?` : 'Delete this document?',
-    );
-    if (!confirmed) return;
+    if (!window.confirm(name ? `Delete “${name}”?` : 'Delete this document?')) return;
 
     try {
       await deleteDocument({ workspaceId, documentId }).unwrap();
       toast.success(name ? `Deleted ${name}` : 'Document deleted');
     } catch (err) {
-      const message =
-        err && typeof err === 'object' && 'data' in err
-          ? String((err as { data: unknown }).data)
-          : 'Delete failed';
-      toast.error(message);
+      toast.error(getErrorMessage(err, 'Delete failed'));
     }
   };
 

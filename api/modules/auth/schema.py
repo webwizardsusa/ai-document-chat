@@ -1,3 +1,5 @@
+"""Auth request/response schemas."""
+
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, field_validator

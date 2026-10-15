@@ -13,6 +13,7 @@ import {
 import {
   DeleteOutlined as DeleteIcon,
   DescriptionOutlined as DocIcon,
+  DownloadOutlined as DownloadIcon,
 } from '@mui/icons-material';
 import { layoutConfig } from '@/app/providers';
 import { useLayout } from '@/app/providers/useLayout';
@@ -20,6 +21,7 @@ import UploadDocumentButton from '@/features/document/components/UploadDocumentB
 import {
   documentStatusColor,
   useDeleteDocument,
+  useDownloadDocument,
   useWorkspaceDocuments,
 } from '@/features/document/hooks';
 import { formatFileSize } from '@/features/document/utils/formatFileSize';
@@ -32,6 +34,7 @@ const DocsPanelContent = ({ workspaceId }: { workspaceId: string }) => {
   const { documents, isLoading, isError, isEmpty, refetch } =
     useWorkspaceDocuments(workspaceId);
   const { deletingId, onDelete } = useDeleteDocument({ workspaceId });
+  const { onDownload } = useDownloadDocument({ workspaceId });
 
   return (
     <Box
@@ -117,16 +120,26 @@ const DocsPanelContent = ({ workspaceId }: { workspaceId: string }) => {
                   bgcolor: 'grey.50',
                 }}
                 secondaryAction={
-                  <IconButton
-                    edge="end"
-                    aria-label={`Delete ${doc.original_name}`}
-                    onClick={() => onDelete(doc.id, doc.original_name)}
-                    disabled={deletingId === doc.id}
-                    size="small"
-                    sx={{ color: 'error.main' }}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                    <IconButton
+                      edge="end"
+                      aria-label={`Download ${doc.original_name}`}
+                      onClick={() => void onDownload(doc.id, doc.original_name)}
+                      size="small"
+                    >
+                      <DownloadIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      edge="end"
+                      aria-label={`Delete ${doc.original_name}`}
+                      onClick={() => onDelete(doc.id, doc.original_name)}
+                      disabled={deletingId === doc.id}
+                      size="small"
+                      sx={{ color: 'error.main' }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
                 }
               >
                 <ListItemIcon sx={{ minWidth: 36, mt: 0.4 }}>
@@ -143,7 +156,7 @@ const DocsPanelContent = ({ workspaceId }: { workspaceId: string }) => {
                         alignItems: 'flex-start',
                         gap: 0.5,
                         mt: 0.5,
-                        pr: 4,
+                        pr: 5,
                       }}
                     >
                       <Box
@@ -173,7 +186,7 @@ const DocsPanelContent = ({ workspaceId }: { workspaceId: string }) => {
                       sx: {
                         fontSize: '0.875rem',
                         fontWeight: 600,
-                        pr: 4,
+                        pr: 5,
                       },
                     },
                   }}

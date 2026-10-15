@@ -1,4 +1,8 @@
-"""Split extracted document text into overlapping chunks."""
+"""Split extracted document text into overlapping chunks.
+
+CHUNK_SIZE / CHUNK_OVERLAP are character counts (LangChain default), not tokens.
+token_count on each chunk is informational for UI/debug only.
+"""
 
 from __future__ import annotations
 
@@ -39,6 +43,7 @@ def split_document(
     chunks: list[TextChunk] = []
     index = 0
 
+    # Split per page so page_number stays accurate for citations.
     for page in extracted.pages:
         parts = splitter.split_text(page.text)
         for part in parts:

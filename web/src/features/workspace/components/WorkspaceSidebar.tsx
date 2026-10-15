@@ -11,6 +11,8 @@ type Props = {
   activeWorkspaceId: string | null;
   onSelectWorkspace: (id: string) => void;
   onCreateWorkspace: () => void;
+  onDeleteWorkspace?: (id: string, name: string) => void;
+  deletingWorkspaceId?: string | null;
   isLoadingWorkspaces?: boolean;
 };
 
@@ -19,6 +21,8 @@ const SidebarContent = ({
   activeWorkspaceId,
   onSelectWorkspace,
   onCreateWorkspace,
+  onDeleteWorkspace,
+  deletingWorkspaceId,
   isLoadingWorkspaces,
 }: Props) => (
   <Box
@@ -67,6 +71,8 @@ const SidebarContent = ({
       activeId={activeWorkspaceId}
       onSelect={onSelectWorkspace}
       onCreate={onCreateWorkspace}
+      onDelete={onDeleteWorkspace}
+      deletingId={deletingWorkspaceId}
       isLoading={isLoadingWorkspaces}
     />
 

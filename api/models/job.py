@@ -10,6 +10,8 @@ from .enums import JobStatus
 
 
 class Job(Base):
+    """Async work unit (document_process) tracked for Celery workers."""
+
     __tablename__ = "jobs"
     __table_args__ = (
         CheckConstraint(
