@@ -1,5 +1,5 @@
 import { Box, Button, IconButton, Stack, Tooltip, Typography } from '@mui/material';
-import { DeleteOutline as ClearChatIcon } from '@mui/icons-material';
+import { DeleteOutlined as ClearChatIcon } from '@mui/icons-material';
 import { PageContainer } from '@/shared/components';
 import UploadDocumentButton from '@/features/document/components/UploadDocumentButton';
 import ChatComposer from '@/features/chat/components/ChatComposer';

@@ -40,7 +40,7 @@ const MessageBubble = ({
       </Typography>
     </Box>
     {!isUser && message.sources?.length ? (
-      <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap" sx={{ mt: 0.75 }}>
+      <Stack direction="row" spacing={0.5} useFlexGap sx={{ mt: 0.75, flexWrap: 'wrap' }}>
         {message.sources.map((source) => (
           <Chip
             key={source.id}
