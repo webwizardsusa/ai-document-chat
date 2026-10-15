@@ -1,6 +1,7 @@
-import { Box, Chip, Stack, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import type { RefObject } from 'react';
 import type { ChatMessage } from '../types/chat';
+import { formatMessageText } from '../utils/formatMessageText';
 
 type Props = {
   messages: ChatMessage[];
@@ -12,10 +13,10 @@ type Props = {
 };
 
 const MessageBubble = ({
-  message,
+  content,
   isUser,
 }: {
-  message: Pick<ChatMessage, 'content' | 'sources'>;
+  content: string;
   isUser: boolean;
 }) => (
   <Box
@@ -35,27 +36,10 @@ const MessageBubble = ({
         wordBreak: 'break-word',
       }}
     >
-      <Typography variant="body2" sx={{ lineHeight: 1.55 }}>
-        {message.content}
+      <Typography variant="body2" component="div" sx={{ lineHeight: 1.55 }}>
+        {formatMessageText(content)}
       </Typography>
     </Box>
-    {!isUser && message.sources?.length ? (
-      <Stack direction="row" spacing={0.5} useFlexGap sx={{ mt: 0.75, flexWrap: 'wrap' }}>
-        {message.sources.map((source) => (
-          <Chip
-            key={source.id}
-            size="small"
-            variant="outlined"
-            label={
-              source.page_number != null
-                ? `${source.document_name} p.${source.page_number}`
-                : source.document_name
-            }
-            sx={{ height: 22, maxWidth: 220 }}
-          />
-        ))}
-      </Stack>
-    ) : null}
   </Box>
 );
 
@@ -98,16 +82,15 @@ const ChatMessageList = ({
           {messages.map((message) => (
             <MessageBubble
               key={message.id}
-              message={message}
+              content={message.content}
               isUser={message.sender_type === 'user'}
             />
           ))}
-          {pendingUser ? <MessageBubble message={pendingUser} isUser /> : null}
+          {pendingUser ? (
+            <MessageBubble content={pendingUser.content} isUser />
+          ) : null}
           {streamingText != null ? (
-            <MessageBubble
-              message={{ content: streamingText || '…', sources: [] }}
-              isUser={false}
-            />
+            <MessageBubble content={streamingText || '…'} isUser={false} />
           ) : isSending ? (
             <Typography variant="body2" color="textSecondary" sx={{ alignSelf: 'flex-start' }}>
               Thinking...
