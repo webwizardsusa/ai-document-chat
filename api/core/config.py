@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
     OPENAI_CHAT_MODEL: str = "gpt-4o-mini"
     GEMINI_EMBEDDING_MODEL: str = "models/gemini-embedding-001"
-    GEMINI_CHAT_MODEL: str = "gemini-3.5-flash-lite"
+    GEMINI_CHAT_MODEL: str = "gemini-flash-lite-latest"
     # Character counts for LangChain splitter (not tokens).
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 200
