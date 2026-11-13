@@ -23,7 +23,16 @@ type Options = {
 const validateFile = (file: File): string | null => {
   const idx = file.name.lastIndexOf('.');
   const extension = idx >= 0 ? file.name.slice(idx).toLowerCase() : '';
-  if (!ALLOWED_EXTENSIONS.has(extension) || (file.type && !ALLOWED_MIME_TYPES.has(file.type))) {
+  if (!ALLOWED_EXTENSIONS.has(extension)) {
+    return 'Only PDF, TXT, and MD files are allowed';
+  }
+  // Browsers often send empty or application/octet-stream; trust extension then.
+  const mime = file.type;
+  if (
+    mime &&
+    mime !== 'application/octet-stream' &&
+    !ALLOWED_MIME_TYPES.has(mime)
+  ) {
     return 'Only PDF, TXT, and MD files are allowed';
   }
   if (file.size <= 0) return 'Empty file';

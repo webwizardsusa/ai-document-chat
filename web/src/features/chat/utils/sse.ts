@@ -58,18 +58,26 @@ export const readSseStream = async (
     }
   };
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const parts = buffer.split('\n\n');
-    buffer = parts.pop() ?? '';
-    for (const part of parts) {
-      if (part.trim()) flushBlock(part);
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() ?? '';
+      for (const part of parts) {
+        if (part.trim()) flushBlock(part);
+      }
+      if (errorMessage) break;
     }
-    if (errorMessage) break;
+    if (!errorMessage && buffer.trim()) flushBlock(buffer);
+  } finally {
+    try {
+      await reader.cancel();
+    } catch {
+      // stream already closed
+    }
   }
-  if (!errorMessage && buffer.trim()) flushBlock(buffer);
 
   if (errorMessage) return { ok: false, message: errorMessage };
   if (!finished) return { ok: false, message: 'Stream ended before the answer completed' };

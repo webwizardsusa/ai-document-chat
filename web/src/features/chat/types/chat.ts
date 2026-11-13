@@ -20,10 +20,6 @@ export type ChatMessage = {
   sources: MessageSource[];
 };
 
-export type AskMessageRequest = {
-  content: string;
-};
-
 export type AskMessageResponse = {
   user_message: ChatMessage;
   assistant_message: ChatMessage;

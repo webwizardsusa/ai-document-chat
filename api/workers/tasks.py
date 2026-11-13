@@ -7,7 +7,10 @@ from uuid import UUID
 
 from core.db import SessionLocal
 from services.document_processing import DocumentProcessor
-from services.jobs import reap_stale_jobs as reap_stale_jobs_service
+from services.jobs import (
+    cleanup_stale_rows as cleanup_stale_rows_service,
+    reap_stale_jobs as reap_stale_jobs_service,
+)
 from workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -50,3 +53,9 @@ def reap_stale_jobs() -> dict:
     stats = _with_db(reap_stale_jobs_service)
     logger.info("Job reaper finished: %s", stats)
     return stats
+
+
+@celery_app.task(name="workers.tasks.cleanup_stale_rows")
+def cleanup_stale_rows() -> dict:
+    """Beat task: purge orphan jobs and expired/revoked auth sessions."""
+    return _with_db(cleanup_stale_rows_service)

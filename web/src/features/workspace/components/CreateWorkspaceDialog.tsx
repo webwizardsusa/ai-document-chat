@@ -5,8 +5,8 @@ import {
   DialogContent,
   DialogTitle,
   Stack,
-  TextField,
 } from '@mui/material';
+import { CustomTextField } from '@/shared/components';
 import { useCreateWorkspace } from '../hooks';
 
 type Props = {
@@ -25,7 +25,7 @@ const CreateWorkspaceDialog = ({ open, onClose, onCreated }: Props) => {
         <DialogTitle>Create workspace</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
-            <TextField
+            <CustomTextField
               autoFocus
               label="Workspace name"
               fullWidth

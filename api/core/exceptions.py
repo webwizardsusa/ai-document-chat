@@ -47,12 +47,11 @@ def register_exception_handlers(app):
         request: Request,
         exc: Exception,
     ):
+        request_id = getattr(request.state, "request_id", None)
         logger.exception(
-            "Unhandled exception",
-            extra={
-                "request_id": getattr(request.state, "request_id", None),
-                "method": request.method,
-                "path": request.url.path,
-            },
+            "Unhandled exception request_id=%s method=%s path=%s",
+            request_id,
+            request.method,
+            request.url.path,
         )
         return internal_error(message="Internal Server Error")

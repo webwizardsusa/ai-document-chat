@@ -6,5 +6,3 @@ export const layoutConfig = {
   miniSidebarWidth: 87,
   topbarHeight: 64,
 };
-
-export type SidebarCollapse = 'full-sidebar' | 'mini-sidebar';

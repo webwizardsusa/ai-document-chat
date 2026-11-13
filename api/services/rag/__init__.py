@@ -49,6 +49,7 @@ def search_similar_chunks(
         .where(
             Document.workspace_id == workspace_id,
             Document.status == DocumentStatus.READY.value,
+            Document.embedding_model == settings.embedding_model,
             DocumentChunk.embedding.is_not(None),
         )
         .order_by(distance)

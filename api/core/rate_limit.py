@@ -14,6 +14,7 @@ from core.deps import CurrentUserDep
 logger = logging.getLogger(__name__)
 
 _redis: redis.Redis | None = None
+_WINDOW_SECONDS = 60
 
 
 def _client() -> redis.Redis | None:
@@ -23,8 +24,9 @@ def _client() -> redis.Redis | None:
         return None
     if _redis is None:
         try:
+            redis_url = (settings.RATE_LIMIT_REDIS_URL or "").strip() or settings.CELERY_BROKER_URL
             _redis = redis.from_url(
-                settings.CELERY_BROKER_URL,
+                redis_url,
                 decode_responses=True,
                 socket_connect_timeout=1,
                 socket_timeout=1,
@@ -42,10 +44,12 @@ def _check(key: str, limit: int) -> None:
     if client is None:
         return
     try:
-        count = int(client.incr(key))
-        if count == 1:
-            client.expire(key, 60)
-        if count > limit:
+        # Always set TTL in the same round-trip so keys cannot stick forever.
+        pipe = client.pipeline()
+        pipe.incr(key)
+        pipe.expire(key, _WINDOW_SECONDS)
+        count, _ = pipe.execute()
+        if int(count) > limit:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Rate limit exceeded. Please try again shortly.",
@@ -56,11 +60,19 @@ def _check(key: str, limit: int) -> None:
         logger.exception("Rate limit check failed for key %s", key)
 
 
+def _client_ip(request: Request) -> str:
+    """Peer IP by default; X-Forwarded-For only when TRUST_PROXY_HEADERS=true."""
+    if settings.TRUST_PROXY_HEADERS:
+        forwarded = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+        if forwarded:
+            return forwarded
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
 def rate_limit_auth(request: Request) -> None:
-    ip = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
-    if not ip and request.client:
-        ip = request.client.host
-    _check(f"rl:auth:{ip or 'unknown'}", settings.RATE_LIMIT_AUTH_PER_MINUTE)
+    _check(f"rl:auth:{_client_ip(request)}", settings.RATE_LIMIT_AUTH_PER_MINUTE)
 
 
 def rate_limit_chat(user: CurrentUserDep) -> None:

@@ -4,14 +4,9 @@ import {
   type BaseQueryFn,
   type FetchArgs,
   type FetchBaseQueryError,
-  type FetchBaseQueryMeta,
 } from '@reduxjs/toolkit/query/react';
-import {
-  broadcastCredentials,
-  withRefreshLock,
-} from '@/features/auth/authSync';
-import { logout, setCredentials } from '@/features/auth/slices/authSlice';
-import type { LoginResponse } from '@/features/auth/types/auth';
+import { refreshSession } from '@/features/auth/refreshSession';
+import { logout } from '@/features/auth/slices/authSlice';
 
 export const API_TAGS = {
   Auth: 'Auth',
@@ -61,65 +56,6 @@ const resolveErrorMessage = (data: unknown): string => {
   return 'Request failed';
 };
 
-const unwrapEnvelope = <T>(data: unknown): T | undefined => {
-  if (data && typeof data === 'object' && 'status' in data) {
-    const envelope = data as ApiEnvelope<T>;
-    if (!envelope.status) {
-      return undefined;
-    }
-    return envelope.result;
-  }
-  return data as T | undefined;
-};
-
-let refreshPromise: Promise<LoginResponse | null> | null = null;
-
-const refreshAccessToken: BaseQueryFn<
-  void,
-  LoginResponse | null,
-  FetchBaseQueryError,
-  object,
-  FetchBaseQueryMeta
-> = async (_args, api, extraOptions) => {
-  if (!refreshPromise) {
-    refreshPromise = withRefreshLock(async () => {
-      // Another tab may have refreshed while we waited for the lock.
-      const existing = (api.getState() as AuthRootState).auth.accessToken;
-      if (existing) {
-        // Re-check by attempting nothing — caller retries original request.
-        // Still run refresh if we got here from 401; cookie may be rotated.
-      }
-
-      const refreshResult = await rawBaseQuery(
-        { url: '/auth/refresh', method: 'POST', body: {} },
-        api,
-        extraOptions,
-      );
-
-      if (refreshResult.error) {
-        return null;
-      }
-
-      const payload = unwrapEnvelope<LoginResponse>(refreshResult.data);
-      if (!payload?.access_token) {
-        return null;
-      }
-
-      api.dispatch(setCredentials(payload));
-      broadcastCredentials(payload);
-      return payload;
-    }).finally(() => {
-      refreshPromise = null;
-    });
-  }
-
-  const payload = await refreshPromise;
-  if (!payload) {
-    return { error: { status: 401, data: 'Session expired' } as FetchBaseQueryError };
-  }
-  return { data: payload };
-};
-
 const isAuthBootstrapUrl = (url: string) =>
   url.includes('/auth/login') ||
   url.includes('/auth/refresh') ||
@@ -134,9 +70,9 @@ const baseQueryWithEnvelope: BaseQueryFn<
   const url = typeof args === 'string' ? args : args.url;
 
   if (result.error?.status === 401 && !isAuthBootstrapUrl(url)) {
-    const refreshResult = await refreshAccessToken(undefined, api, extraOptions);
+    const token = await refreshSession();
 
-    if (refreshResult.data) {
+    if (token) {
       result = await rawBaseQuery(args, api, extraOptions);
     } else {
       api.dispatch(logout());

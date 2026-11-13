@@ -36,13 +36,18 @@ export const useWorkspaceChat = ({ workspaceId, enabled = true }: Options) => {
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const workspaceIdRef = useRef(workspaceId);
+  workspaceIdRef.current = workspaceId;
 
-  // Reset composer when switching workspaces (render-time sync).
+  // Reset composer + abort in-flight stream when switching workspaces.
   if (workspaceId !== draftWorkspaceId) {
+    abortRef.current?.abort();
+    abortRef.current = null;
     setDraftWorkspaceId(workspaceId);
     setDraft('');
     setPendingUser(null);
     setStreamingText(null);
+    setIsSending(false);
   }
 
   useEffect(() => {
@@ -62,11 +67,12 @@ export const useWorkspaceChat = ({ workspaceId, enabled = true }: Options) => {
   const send = async () => {
     if (!workspaceId || !canSend) return;
     const content = draft.trim();
+    const sendWorkspaceId = workspaceId;
     setDraft('');
     setIsSending(true);
     setPendingUser({
       id: `temp-user-${Date.now()}`,
-      workspace_id: workspaceId,
+      workspace_id: sendWorkspaceId,
       sender_type: 'user',
       content,
       created_at: new Date().toISOString(),
@@ -74,11 +80,12 @@ export const useWorkspaceChat = ({ workspaceId, enabled = true }: Options) => {
     });
     setStreamingText('');
 
+    abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
     try {
-      const response = await authedFetch(messageStreamPath(workspaceId), {
+      const response = await authedFetch(messageStreamPath(sendWorkspaceId), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -93,13 +100,23 @@ export const useWorkspaceChat = ({ workspaceId, enabled = true }: Options) => {
       }
 
       const result = await readSseStream(response, {
-        onToken: (text) => setStreamingText((prev) => (prev ?? '') + text),
+        onToken: (text) => {
+          if (controller.signal.aborted) return;
+          if (workspaceIdRef.current !== sendWorkspaceId) return;
+          setStreamingText((prev) => (prev ?? '') + text);
+        },
         onDone: (payload) => {
+          if (controller.signal.aborted) return;
+          if (workspaceIdRef.current !== sendWorkspaceId) return;
           const data = payload as AskMessageResponse;
           dispatch(
-            chatApi.util.updateQueryData('getMessages', workspaceId, (draftMessages) => {
-              draftMessages.push(data.user_message, data.assistant_message);
-            }),
+            chatApi.util.updateQueryData(
+              'getMessages',
+              sendWorkspaceId,
+              (draftMessages) => {
+                draftMessages.push(data.user_message, data.assistant_message);
+              },
+            ),
           );
           resetPending();
         },
@@ -108,21 +125,30 @@ export const useWorkspaceChat = ({ workspaceId, enabled = true }: Options) => {
       if (!result.ok) throw new Error(result.message);
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
-      setDraft(content);
-      resetPending();
-      toast.error(getErrorMessage(err, 'Failed to send message'));
+      if (workspaceIdRef.current === sendWorkspaceId) {
+        setDraft(content);
+        resetPending();
+        toast.error(getErrorMessage(err, 'Failed to send message'));
+      }
     } finally {
-      setIsSending(false);
-      abortRef.current = null;
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
+      if (workspaceIdRef.current === sendWorkspaceId) {
+        setIsSending(false);
+      }
     }
   };
 
   const onClearHistory = async () => {
     if (!workspaceId) return;
     if (!window.confirm('Clear all chat messages in this workspace?')) return;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    resetPending();
+    setIsSending(false);
     try {
       await clearMessages(workspaceId).unwrap();
-      resetPending();
       toast.success('Chat history cleared');
     } catch (err) {
       toast.error(getErrorMessage(err, 'Failed to clear chat'));

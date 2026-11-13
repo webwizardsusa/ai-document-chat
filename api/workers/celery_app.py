@@ -24,12 +24,16 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     task_default_queue="document_processing",
     broker_connection_retry_on_startup=True,
-    task_soft_time_limit=600,
-    task_time_limit=720,
+    task_soft_time_limit=settings.CELERY_TASK_SOFT_TIME_LIMIT,
+    task_time_limit=settings.CELERY_TASK_TIME_LIMIT,
     beat_schedule={
         "reap-stale-document-jobs": {
             "task": "workers.tasks.reap_stale_jobs",
             "schedule": schedule(run_every=max(15, settings.JOB_REAPER_INTERVAL_SECONDS)),
+        },
+        "cleanup-stale-rows": {
+            "task": "workers.tasks.cleanup_stale_rows",
+            "schedule": schedule(run_every=3600),
         },
     },
 )

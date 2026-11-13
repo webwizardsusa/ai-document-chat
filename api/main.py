@@ -13,6 +13,7 @@ from modules import auth, chat, document, workspace
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    # request_id / path / status are embedded in the message by RequestIdMiddleware
 )
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 

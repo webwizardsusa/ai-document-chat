@@ -13,10 +13,6 @@ export const workspaceApi = baseApi.injectEndpoints({
             ]
           : [{ type: API_TAGS.Workspace, id: 'LIST' }],
     }),
-    getWorkspace: build.query<Workspace, string>({
-      query: (id) => `/workspaces/${id}`,
-      providesTags: (_result, _error, id) => [{ type: API_TAGS.Workspace, id }],
-    }),
     createWorkspace: build.mutation<Workspace, CreateWorkspaceRequest>({
       query: (body) => ({
         url: '/workspaces',
@@ -42,7 +38,6 @@ export const workspaceApi = baseApi.injectEndpoints({
 
 export const {
   useGetWorkspacesQuery,
-  useGetWorkspaceQuery,
   useCreateWorkspaceMutation,
   useDeleteWorkspaceMutation,
 } = workspaceApi;

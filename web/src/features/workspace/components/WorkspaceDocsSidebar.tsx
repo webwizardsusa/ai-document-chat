@@ -19,11 +19,11 @@ import { layoutConfig } from '@/app/providers';
 import { useLayout } from '@/app/providers/useLayout';
 import UploadDocumentButton from '@/features/document/components/UploadDocumentButton';
 import {
-  documentStatusColor,
   useDeleteDocument,
   useDownloadDocument,
   useWorkspaceDocuments,
 } from '@/features/document/hooks';
+import { documentStatusColor } from '@/features/document/utils/documentStatus';
 import { formatFileSize } from '@/features/document/utils/formatFileSize';
 
 type Props = {

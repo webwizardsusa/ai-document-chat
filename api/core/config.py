@@ -5,8 +5,6 @@ from typing import Literal
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from models.constants import VECTOR_DIMENSION
-
 # Committed example / placeholder secrets — never allow outside APP_ENV=local.
 _WEAK_JWT_SECRETS = frozenset(
     {
@@ -59,6 +57,9 @@ class Settings(BaseSettings):
 
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
+    # Must stay below JOB_STALE_MINUTES so reaper cannot dual-run a live worker.
+    CELERY_TASK_SOFT_TIME_LIMIT: int = 600
+    CELERY_TASK_TIME_LIMIT: int = 720
 
     DB_POOL_SIZE: int = 5
     DB_MAX_OVERFLOW: int = 10
@@ -68,16 +69,16 @@ class Settings(BaseSettings):
     RATE_LIMIT_AUTH_PER_MINUTE: int = 20
     RATE_LIMIT_CHAT_PER_MINUTE: int = 30
     RATE_LIMIT_UPLOAD_PER_MINUTE: int = 10
+    # Prefer a dedicated Redis DB; falls back to CELERY_BROKER_URL if empty.
+    RATE_LIMIT_REDIS_URL: str = "redis://localhost:6379/2"
+    # Only honor X-Forwarded-For when true (behind a trusted reverse proxy).
+    TRUST_PROXY_HEADERS: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
         extra="ignore",
     )
-
-    @property
-    def vector_dimension(self) -> int:
-        return VECTOR_DIMENSION
 
     @property
     def jwt_secret(self) -> str:
@@ -132,6 +133,16 @@ class Settings(BaseSettings):
             raise ValueError("OPENAI_API_KEY is required when AI_PROVIDER=openai")
         if self.AI_PROVIDER == "gemini" and not self.gemini_api_key:
             raise ValueError("GEMINI_API_KEY is required when AI_PROVIDER=gemini")
+
+        if self.CELERY_TASK_SOFT_TIME_LIMIT >= self.CELERY_TASK_TIME_LIMIT:
+            raise ValueError(
+                "CELERY_TASK_SOFT_TIME_LIMIT must be smaller than CELERY_TASK_TIME_LIMIT"
+            )
+        if self.JOB_STALE_MINUTES * 60 <= self.CELERY_TASK_TIME_LIMIT:
+            raise ValueError(
+                "JOB_STALE_MINUTES must exceed CELERY_TASK_TIME_LIMIT "
+                f"({self.CELERY_TASK_TIME_LIMIT}s) so the reaper cannot dual-run a live worker"
+            )
         return self
 
 

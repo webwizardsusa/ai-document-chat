@@ -20,7 +20,7 @@ from modules.document.schema import (
     MAX_UPLOAD_BYTES,
 )
 from modules.workspace.service import WorkspaceService
-from services.jobs import enqueue_document_process
+from services.jobs import enqueue_document_process, mark_job_failed
 from services.storage import file_sha256, get_storage
 
 logger = logging.getLogger(__name__)
@@ -154,13 +154,12 @@ class DocumentService:
             enqueue_document_process(job.id)
         except Exception:
             logger.exception("Failed to enqueue document job %s", job.id)
-            job.status = JobStatus.FAILED.value
-            job.error = "Failed to enqueue processing task"
-            document.status = DocumentStatus.FAILED.value
-            document.error_message = (
-                "Processing could not be started. Please try uploading again."
+            mark_job_failed(
+                self.db,
+                job,
+                document,
+                "Failed to enqueue processing task",
             )
-            self.db.commit()
             self.db.refresh(document)
 
         return document

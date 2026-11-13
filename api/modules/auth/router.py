@@ -58,6 +58,7 @@ def register(payload: RegisterRequest, db: DbDep, _rate_limit: AuthRateLimitDep)
 def refresh(
     request: Request,
     db: DbDep,
+    _rate_limit: AuthRateLimitDep,
     payload: RefreshRequest = RefreshRequest(),
 ):
     refresh_token = _resolve_refresh_token(request, payload)

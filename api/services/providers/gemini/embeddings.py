@@ -12,14 +12,21 @@ class GeminiEmbeddingError(RuntimeError):
     pass
 
 
+_client_singleton: GoogleGenerativeAIEmbeddings | None = None
+
+
 def _client() -> GoogleGenerativeAIEmbeddings:
+    global _client_singleton
+    if _client_singleton is not None:
+        return _client_singleton
     api_key = settings.gemini_api_key
     if not api_key:
         raise GeminiEmbeddingError("GEMINI_API_KEY is not configured")
-    return GoogleGenerativeAIEmbeddings(
+    _client_singleton = GoogleGenerativeAIEmbeddings(
         model=settings.GEMINI_EMBEDDING_MODEL,
         google_api_key=api_key,
     )
+    return _client_singleton
 
 
 def embed_documents(texts: list[str]) -> list[list[float]]:

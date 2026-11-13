@@ -6,11 +6,12 @@ import logging
 from datetime import timedelta
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.orm import Session
 
 from core.config import settings
 from core.time import ensure_utc, utcnow
+from models.auth_session import AuthSession
 from models.document import Document
 from models.enums import DocumentStatus, JobStatus
 from models.job import Job
@@ -106,10 +107,53 @@ def reap_stale_jobs(db: Session) -> dict[str, int]:
     return stats
 
 
+def cleanup_stale_rows(db: Session) -> dict[str, int]:
+    """Delete orphan jobs and expired/revoked auth sessions (hourly beat)."""
+    now = utcnow()
+    session_cutoff = now - timedelta(days=30)
+
+    orphan_result = db.execute(
+        delete(Job).where(
+            Job.document_id.is_(None),
+            or_(
+                Job.status.in_(
+                    [JobStatus.COMPLETED.value, JobStatus.FAILED.value]
+                ),
+                Job.created_at < session_cutoff,
+            ),
+        )
+    )
+    session_result = db.execute(
+        delete(AuthSession).where(
+            or_(
+                AuthSession.expires_at < now,
+                and_(
+                    AuthSession.revoked_at.is_not(None),
+                    AuthSession.revoked_at < session_cutoff,
+                ),
+            )
+        )
+    )
+    db.commit()
+    stats = {
+        "orphan_jobs": int(orphan_result.rowcount or 0),
+        "auth_sessions": int(session_result.rowcount or 0),
+    }
+    logger.info("Cleanup stale rows finished: %s", stats)
+    return stats
+
+
+_REAP_BATCH = 100
+
+
 def _lock_jobs(db: Session, status: str) -> list[Job]:
     return list(
         db.scalars(
-            select(Job).where(Job.status == status).with_for_update(skip_locked=True)
+            select(Job)
+            .where(Job.status == status)
+            .order_by(Job.created_at.asc())
+            .limit(_REAP_BATCH)
+            .with_for_update(skip_locked=True)
         ).all()
     )
 

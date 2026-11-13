@@ -1,6 +1,7 @@
-import { Box, Button, TextField, Typography } from '@mui/material';
+import { Box, Button, Typography } from '@mui/material';
 import { Send as SendIcon } from '@mui/icons-material';
 import type { FormEvent, KeyboardEvent } from 'react';
+import { CustomTextField } from '@/shared/components';
 
 const INPUT_HEIGHT = 44;
 
@@ -45,7 +46,7 @@ const ChatComposer = ({
         width: '100%',
       }}
     >
-      <TextField
+      <CustomTextField
         fullWidth
         value={draft}
         onChange={(e) => setDraft(e.target.value)}

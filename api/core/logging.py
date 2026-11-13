@@ -1,37 +1,61 @@
-"""Request ID + timing middleware for production logs."""
+"""Request ID + timing middleware for production logs (pure ASGI — safe with SSE)."""
+
+from __future__ import annotations
 
 import logging
 import time
 import uuid
 
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import Response
-
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 logger = logging.getLogger("api.request")
 
 
-class RequestIdMiddleware(BaseHTTPMiddleware):
-    """Attach X-Request-ID and log method/path/status/duration."""
+class RequestIdMiddleware:
+    """Attach X-Request-ID and log method/path/status/duration without buffering the body."""
 
-    async def dispatch(self, request: Request, call_next) -> Response:
-        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
-        request.state.request_id = request_id
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        headers = {
+            key.decode("latin-1").lower(): value.decode("latin-1")
+            for key, value in scope.get("headers", [])
+        }
+        request_id = headers.get("x-request-id") or str(uuid.uuid4())
+        scope.setdefault("state", {})
+        # Starlette Request.state reads from scope["state"]
+        if not isinstance(scope.get("state"), dict):
+            scope["state"] = {}
+        scope["state"]["request_id"] = request_id
+
         started = time.perf_counter()
+        status_code = 500
 
-        response = await call_next(request)
+        async def send_wrapper(message: Message) -> None:
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = int(message.get("status", 500))
+                raw_headers = list(message.get("headers") or [])
+                raw_headers.append((b"x-request-id", request_id.encode("latin-1")))
+                message = {**message, "headers": raw_headers}
+            await send(message)
 
-        duration_ms = (time.perf_counter() - started) * 1000
-        response.headers["X-Request-ID"] = request_id
-        logger.info(
-            "request completed",
-            extra={
-                "request_id": request_id,
-                "method": request.method,
-                "path": request.url.path,
-                "status_code": response.status_code,
-                "duration_ms": round(duration_ms, 2),
-            },
-        )
-        return response
+        try:
+            await self.app(scope, receive, send_wrapper)
+        finally:
+            duration_ms = (time.perf_counter() - started) * 1000
+            path = scope.get("path", "")
+            method = scope.get("method", "")
+            logger.info(
+                "request completed request_id=%s method=%s path=%s status_code=%s duration_ms=%.2f",
+                request_id,
+                method,
+                path,
+                status_code,
+                duration_ms,
+            )

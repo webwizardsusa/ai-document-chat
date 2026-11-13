@@ -15,7 +15,6 @@ export const useAuthBootstrap = () => {
 
   useEffect(() => {
     let cancelled = false;
-    localStorage.removeItem('ai_document_auth');
 
     const restore = async () => {
       try {

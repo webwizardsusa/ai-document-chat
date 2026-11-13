@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterator
 from uuid import UUID
 
@@ -10,6 +11,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from core.config import settings
+from core.db import SessionLocal
 from models.document import Document
 from models.document_chunk import DocumentChunk
 from models.enums import DocumentStatus, SenderType
@@ -31,6 +34,8 @@ from services.rag.generate import (
     iter_answer_tokens,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class ChatService:
     def __init__(self, db: Session):
@@ -47,7 +52,8 @@ class ChatService:
             ).all()
         )
         sources_by_message = self._load_sources(
-            [m.id for m in messages if m.sender_type == SenderType.ASSISTANT.value]
+            self.db,
+            [m.id for m in messages if m.sender_type == SenderType.ASSISTANT.value],
         )
         return [
             self._to_response(m, sources=sources_by_message.get(m.id, []))
@@ -74,9 +80,11 @@ class ChatService:
         data: AskMessageRequest,
     ) -> AskMessageResponse:
         chunks = self._retrieve(workspace_id, user, data.content)
+        self._release_request_db()
         try:
             answer = generate_answer(data.content, chunks)
         except ChatGenerationError as exc:
+            logger.warning("Chat generation failed", exc_info=exc)
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="AI chat is not available right now",
@@ -95,13 +103,17 @@ class ChatService:
         except HTTPException as exc:
             yield _sse("error", {"message": str(exc.detail)})
             return
+        finally:
+            # Always return the request pool connection before LLM latency.
+            self._release_request_db()
 
         parts: list[str] = []
         try:
             for token in iter_answer_tokens(data.content, chunks):
                 parts.append(token)
                 yield _sse("token", {"text": token})
-        except ChatGenerationError:
+        except ChatGenerationError as exc:
+            logger.warning("Chat stream generation failed", exc_info=exc)
             yield _sse("error", {"message": "AI chat is not available right now"})
             return
 
@@ -113,10 +125,18 @@ class ChatService:
         try:
             result = self._persist(workspace_id, data.content, answer, chunks)
         except Exception:
+            logger.exception("Failed to persist streamed chat messages")
             yield _sse("error", {"message": "Failed to save messages"})
             return
 
         yield _sse("done", result.model_dump(mode="json"))
+
+    def _release_request_db(self) -> None:
+        """Close the request-scoped session so the pool slot is free during LLM I/O."""
+        try:
+            self.db.close()
+        except Exception:
+            logger.exception("Failed to release chat request DB session")
 
     def _retrieve(
         self,
@@ -125,15 +145,32 @@ class ChatService:
         question: str,
     ) -> list[RetrievedChunk]:
         self.workspaces.get_owned(workspace_id, user)
-        ready_count = self.db.scalar(
+        ready_matching = self.db.scalar(
             select(func.count())
             .select_from(Document)
             .where(
                 Document.workspace_id == workspace_id,
                 Document.status == DocumentStatus.READY.value,
+                Document.embedding_model == settings.embedding_model,
             )
         )
-        if not ready_count:
+        if not ready_matching:
+            ready_any = self.db.scalar(
+                select(func.count())
+                .select_from(Document)
+                .where(
+                    Document.workspace_id == workspace_id,
+                    Document.status == DocumentStatus.READY.value,
+                )
+            )
+            if ready_any:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "Documents were embedded with a different AI provider. "
+                        "Re-upload documents after switching AI_PROVIDER."
+                    ),
+                )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Upload and wait for at least one ready document before chatting",
@@ -152,7 +189,6 @@ class ChatService:
             workspace_id=workspace_id,
             query_vector=query_vector,
         )
-        # Release DB connection before LLM latency.
         self.db.commit()
         return chunks
 
@@ -163,23 +199,24 @@ class ChatService:
         answer: str,
         chunks: list[RetrievedChunk],
     ) -> AskMessageResponse:
-        user_message = Message(
-            workspace_id=workspace_id,
-            sender_type=SenderType.USER.value,
-            content=question,
-        )
-        assistant_message = Message(
-            workspace_id=workspace_id,
-            sender_type=SenderType.ASSISTANT.value,
-            content=answer,
-        )
-        self.db.add(user_message)
-        self.db.add(assistant_message)
-
+        """Short-lived session — never hold the request pool connection across LLM calls."""
+        db = SessionLocal()
         try:
-            self.db.flush()
+            user_message = Message(
+                workspace_id=workspace_id,
+                sender_type=SenderType.USER.value,
+                content=question,
+            )
+            assistant_message = Message(
+                workspace_id=workspace_id,
+                sender_type=SenderType.ASSISTANT.value,
+                content=answer,
+            )
+            db.add(user_message)
+            db.add(assistant_message)
+            db.flush()
             for rank, chunk in enumerate(chunks, start=1):
-                self.db.add(
+                db.add(
                     MessageSource(
                         message_id=assistant_message.id,
                         document_chunk_id=chunk.chunk_id,
@@ -187,18 +224,21 @@ class ChatService:
                         rank=rank,
                     )
                 )
-            self.db.commit()
-            self.db.refresh(user_message)
-            self.db.refresh(assistant_message)
+            db.commit()
+            db.refresh(user_message)
+            db.refresh(assistant_message)
+            sources = self._load_sources(db, [assistant_message.id]).get(
+                assistant_message.id, []
+            )
+            return AskMessageResponse(
+                user_message=self._to_response(user_message),
+                assistant_message=self._to_response(assistant_message, sources=sources),
+            )
         except Exception:
-            self.db.rollback()
+            db.rollback()
             raise
-
-        sources = self._load_sources([assistant_message.id]).get(assistant_message.id, [])
-        return AskMessageResponse(
-            user_message=self._to_response(user_message),
-            assistant_message=self._to_response(assistant_message, sources=sources),
-        )
+        finally:
+            db.close()
 
     def _to_response(
         self,
@@ -215,15 +255,16 @@ class ChatService:
             sources=sources or [],
         )
 
+    @staticmethod
     def _load_sources(
-        self,
+        db: Session,
         message_ids: list[UUID],
     ) -> dict[UUID, list[MessageSourceResponse]]:
         """Batch-load citations (avoids N+1)."""
         if not message_ids:
             return {}
 
-        rows = self.db.execute(
+        rows = db.execute(
             select(
                 MessageSource.id,
                 MessageSource.message_id,
