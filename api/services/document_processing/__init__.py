@@ -138,7 +138,7 @@ class DocumentProcessor:
         document.status = DocumentStatus.READY.value
         document.page_count = extracted.page_count
         document.chunk_count = len(chunks)
-        document.embedding_model = settings.EMBEDDING_MODEL
+        document.embedding_model = settings.embedding_model
         document.error_message = None
         self.db.flush()
 
@@ -146,5 +146,5 @@ class DocumentProcessor:
             "document_id": str(document.id),
             "chunk_count": len(chunks),
             "page_count": extracted.page_count,
-            "embedding_model": settings.EMBEDDING_MODEL,
+            "embedding_model": settings.embedding_model,
         }

@@ -13,13 +13,32 @@ x-api-env: &api-env
   REFRESH_COOKIE_SECURE: ${REFRESH_COOKIE_SECURE:-true}
   REFRESH_COOKIE_SAMESITE: ${REFRESH_COOKIE_SAMESITE:-lax}
   STORAGE_ROOT: /data/uploads
-  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+  # AI: both chat + embeddings follow AI_PROVIDER. Vectors always 1536-dim;
+  # switching providers requires re-processing documents.
+  AI_PROVIDER: ${AI_PROVIDER:-openai}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+  OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-4o-mini}
+  GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-models/gemini-embedding-001}
+  GEMINI_CHAT_MODEL: ${GEMINI_CHAT_MODEL:-gemini-3.5-flash-lite}
   CHUNK_SIZE: ${CHUNK_SIZE:-1000}
   CHUNK_OVERLAP: ${CHUNK_OVERLAP:-200}
   EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-64}
-  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  RAG_TOP_K: ${RAG_TOP_K:-5}
+  JOB_STALE_MINUTES: ${JOB_STALE_MINUTES:-30}
+  JOB_PENDING_REENQUEUE_MINUTES: ${JOB_PENDING_REENQUEUE_MINUTES:-5}
+  JOB_PENDING_FAIL_MINUTES: ${JOB_PENDING_FAIL_MINUTES:-120}
+  JOB_REAPER_INTERVAL_SECONDS: ${JOB_REAPER_INTERVAL_SECONDS:-60}
   CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
   CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/1}
+  DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+  DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-10}
+  DB_POOL_RECYCLE: ${DB_POOL_RECYCLE:-1800}
+  RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+  RATE_LIMIT_AUTH_PER_MINUTE: ${RATE_LIMIT_AUTH_PER_MINUTE:-20}
+  RATE_LIMIT_CHAT_PER_MINUTE: ${RATE_LIMIT_CHAT_PER_MINUTE:-30}
+  RATE_LIMIT_UPLOAD_PER_MINUTE: ${RATE_LIMIT_UPLOAD_PER_MINUTE:-10}
 
 services:
   db:
@@ -63,8 +82,6 @@ services:
       timeout: 3s
       retries: 5
       start_period: 5s
-    # ports:
-    #   - "127.0.0.1:6379:6379"
 
   migrate:
     build:
@@ -153,6 +170,32 @@ services:
       timeout: 10s
       retries: 5
       start_period: 40s
+
+  beat:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    image: ai-document-chat-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command:
+      - celery
+      - -A
+      - workers.celery_app.celery_app
+      - beat
+      - --loglevel=INFO
+    env_file:
+      - .env
+    environment:
+      <<: *api-env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - internal
 
   web:
     build:

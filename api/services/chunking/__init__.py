@@ -68,7 +68,7 @@ def split_document(
 
 def _encoding():
     try:
-        return tiktoken.encoding_for_model(settings.EMBEDDING_MODEL)
+        return tiktoken.encoding_for_model(settings.embedding_model)
     except KeyError:
         return tiktoken.get_encoding("cl100k_base")
 

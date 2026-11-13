@@ -1,35 +1,29 @@
-"""LangChain OpenAI embeddings for document chunks and queries."""
+"""Public embedding facade — dispatches to AI_PROVIDER (OpenAI or Gemini)."""
 
 from __future__ import annotations
 
-from langchain_openai import OpenAIEmbeddings
-
-from core.config import settings
 from models.constants import VECTOR_DIMENSION
+from services.providers import get_ai_provider
 
 
 class EmbeddingError(RuntimeError):
     pass
 
 
-def _client() -> OpenAIEmbeddings:
-    api_key = settings.openai_api_key
-    if not api_key:
-        raise EmbeddingError("OPENAI_API_KEY is not configured")
-    return OpenAIEmbeddings(
-        model=settings.EMBEDDING_MODEL,
-        api_key=api_key,
-        chunk_size=max(1, settings.EMBEDDING_BATCH_SIZE),
-        timeout=60,
-        max_retries=1,
-    )
+def _backend():
+    if get_ai_provider() == "gemini":
+        from services.providers.gemini import embeddings as backend
+    else:
+        from services.providers.openai import embeddings as backend
+    return backend
 
 
 def _validate_dimension(vector: list[float]) -> list[float]:
     if len(vector) != VECTOR_DIMENSION:
         raise EmbeddingError(
             f"Embedding dimension {len(vector)} does not match "
-            f"schema VECTOR_DIMENSION={VECTOR_DIMENSION}"
+            f"schema VECTOR_DIMENSION={VECTOR_DIMENSION}. "
+            "For Gemini use models/gemini-embedding-001 with output_dimensionality=1536."
         )
     return vector
 
@@ -39,7 +33,15 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
 
-    vectors = _client().embed_documents(texts)
+    try:
+        vectors = _backend().embed_documents(texts)
+    except EmbeddingError:
+        raise
+    except RuntimeError as exc:
+        raise EmbeddingError(str(exc) or "Failed to embed texts") from exc
+    except Exception as exc:  # noqa: BLE001
+        raise EmbeddingError("Failed to embed texts") from exc
+
     if len(vectors) != len(texts):
         raise EmbeddingError("Embedding API returned unexpected vector count")
     return [_validate_dimension(list(v)) for v in vectors]
@@ -50,4 +52,14 @@ def embed_query(text: str) -> list[float]:
     query = text.strip()
     if not query:
         raise EmbeddingError("Query text is empty")
-    return _validate_dimension(list(_client().embed_query(query)))
+
+    try:
+        vector = _backend().embed_query(query)
+    except EmbeddingError:
+        raise
+    except RuntimeError as exc:
+        raise EmbeddingError(str(exc) or "Failed to embed query") from exc
+    except Exception as exc:  # noqa: BLE001
+        raise EmbeddingError("Failed to embed query") from exc
+
+    return _validate_dimension(list(vector))

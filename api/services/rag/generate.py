@@ -1,13 +1,12 @@
-"""Answer workspace questions with LangChain OpenAI chat."""
+"""Answer workspace questions — dispatches chat to AI_PROVIDER."""
 
 from __future__ import annotations
 
 from collections.abc import Iterator
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 
-from core.config import settings
+from services.providers import get_ai_provider
 from services.rag import RetrievedChunk, build_context
 
 SYSTEM_PROMPT = """You are a helpful assistant for an AI document chat product.
@@ -41,42 +40,19 @@ def _build_messages(question: str, chunks: list[RetrievedChunk]) -> list:
     ]
 
 
-def _llm() -> ChatOpenAI:
-    api_key = settings.openai_api_key
-    if not api_key:
-        raise ChatGenerationError("OPENAI_API_KEY is not configured")
-    return ChatOpenAI(
-        model=settings.CHAT_MODEL,
-        api_key=api_key,
-        temperature=0.2,
-        request_timeout=60,
-        max_retries=1,
-    )
-
-
-def _content_text(content: object) -> str:
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts: list[str] = []
-        for item in content:
-            if isinstance(item, str):
-                parts.append(item)
-            elif isinstance(item, dict) and item.get("type") == "text":
-                parts.append(str(item.get("text", "")))
-        return "".join(parts)
-    return ""
-
-
 def iter_answer_tokens(question: str, chunks: list[RetrievedChunk]) -> Iterator[str]:
     """Stream answer tokens (no DB access)."""
+    messages = _build_messages(question, chunks)
+    if get_ai_provider() == "gemini":
+        from services.providers.gemini import chat as backend
+    else:
+        from services.providers.openai import chat as backend
     try:
-        for piece in _llm().stream(_build_messages(question, chunks)):
-            text = _content_text(getattr(piece, "content", None))
-            if text:
-                yield text
+        yield from backend.stream_tokens(messages)
     except ChatGenerationError:
         raise
+    except RuntimeError as exc:
+        raise ChatGenerationError(str(exc) or "Failed to generate an answer") from exc
     except Exception as exc:  # noqa: BLE001
         raise ChatGenerationError("Failed to generate an answer") from exc
 

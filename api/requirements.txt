@@ -15,6 +15,7 @@ python-dotenv==1.2.3
 celery[redis]==5.5.3
 redis==5.2.1
 langchain-openai==0.3.35
+langchain-google-genai==2.1.12
 langchain-text-splitters==0.3.11
 langchain-core==0.3.79
 pypdf==6.1.1

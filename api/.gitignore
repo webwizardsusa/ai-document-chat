@@ -16,6 +16,11 @@ venv/
 # Local storage
 uploads/
 
+# Celery beat schedule (regenerated on beat start)
+celerybeat-schedule
+celerybeat-schedule.*
+celerybeat.pid
+
 # Test / coverage / tooling
 .pytest_cache/
 .coverage
